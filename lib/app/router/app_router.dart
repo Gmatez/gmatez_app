@@ -66,11 +66,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         if (auth.user?.isAdmin == true) {
           return AppRoutes.admin;
         }
-        if (auth.user?.isPendingHost == true ||
-            auth.user?.isRejectedHost == true ||
-            auth.user?.isSuspendedHost == true) {
-          return AppRoutes.hostPending;
-        }
         return AppRoutes.home;
       }
       if (auth.isAuthenticated &&
@@ -78,19 +73,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           (location == AppRoutes.hostDashboard ||
               location == AppRoutes.hostCallSettings ||
               location == AppRoutes.hostApply ||
-              location == AppRoutes.hostOnboarding ||
-              location == AppRoutes.home)) {
-        // Suspended hosts cannot use studio surfaces until reactivated.
-        return AppRoutes.hostPending;
-      }
-      if (auth.isAuthenticated &&
-          auth.user?.isPendingHost == true &&
-          location == AppRoutes.home) {
-        return AppRoutes.hostPending;
+              location == AppRoutes.hostOnboarding)) {
+        return AppRoutes.home;
       }
       if (auth.isAuthenticated &&
           location.startsWith(AppRoutes.admin) &&
           auth.user?.isAdmin != true) {
+        return AppRoutes.home;
+      }
+      if (auth.user?.isActiveHost == true && location == AppRoutes.discover) {
         return AppRoutes.home;
       }
       return null;
@@ -121,6 +112,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                   if (user?.isActiveHost == true) {
                     return const HostDashboardScreen();
                   }
+                  if (user?.isPendingHost == true ||
+                      user?.isRejectedHost == true ||
+                      user?.isSuspendedHost == true) {
+                    return const HostPendingScreen();
+                  }
                   return const HomeScreen();
                 },
               ),
@@ -147,17 +143,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: AppRoutes.messages,
-                builder: (_, _) => const ConversationsScreen(),
-                routes: [
-                  GoRoute(
-                    path: ':conversationId',
-                    builder: (context, state) {
-                      final id = state.pathParameters['conversationId'] ?? '';
-                      return ChatThreadScreen(conversationId: id);
-                    },
-                  ),
-                ],
+                path: AppRoutes.wallet,
+                builder: (_, _) => const WalletScreen(),
               ),
             ],
           ),
@@ -171,9 +158,19 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      // Chat stays reachable by direct link, but it is not a bottom-nav tab.
       GoRoute(
-        path: AppRoutes.wallet,
-        builder: (_, _) => const WalletScreen(),
+        path: AppRoutes.messages,
+        builder: (_, _) => const ConversationsScreen(),
+        routes: [
+          GoRoute(
+            path: ':conversationId',
+            builder: (context, state) {
+              final id = state.pathParameters['conversationId'] ?? '';
+              return ChatThreadScreen(conversationId: id);
+            },
+          ),
+        ],
       ),
       GoRoute(
         path: AppRoutes.editProfile,

@@ -26,7 +26,7 @@ class CallRtcCredentials extends Equatable {
     return CallRtcCredentials(
       appId: json['appId'] as String? ?? '',
       channelName: json['channelName'] as String? ?? '',
-      uid: json['uid'] as int? ?? 0,
+      uid: _asInt(json['uid']),
       token: json['token'] as String? ?? '',
       tokenExpiresAt: expires,
     );
@@ -148,8 +148,8 @@ class CallSession extends Equatable {
     }
 
     CallRtcCredentials? rtc;
-    final rtcRaw = json['rtc'];
-    if (rtcRaw is Map<String, dynamic>) {
+    final rtcRaw = _asStringMap(json['rtc']);
+    if (rtcRaw != null) {
       rtc = CallRtcCredentials.fromJson(rtcRaw);
     } else if (json['token'] is String && json['channelName'] is String) {
       rtc = CallRtcCredentials.fromJson(json);
@@ -189,4 +189,27 @@ class CallSession extends Equatable {
 
   @override
   List<Object?> get props => [id, status, settlementStatus, billedAmountCents];
+}
+
+Map<String, dynamic>? _asStringMap(dynamic value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return Map<String, dynamic>.from(value);
+  }
+  return null;
+}
+
+int _asInt(dynamic value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value) ?? 0;
+  }
+  return 0;
 }

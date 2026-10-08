@@ -12,6 +12,11 @@ abstract final class CallStateMachine {
     },
     CallStatus.ringing: {
       CallStatus.accepted,
+      // Agora accept moves ACCEPTED → CONNECTING immediately. If the
+      // accepted event is missed, the caller must still apply connecting
+      // or connected and join the channel.
+      CallStatus.connecting,
+      CallStatus.connected,
       CallStatus.rejected,
       CallStatus.timeout,
       CallStatus.cancelled,

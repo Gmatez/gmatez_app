@@ -30,6 +30,8 @@ abstract final class ApiPaths {
   static String callRtcJoined(String id) => '/calls/$id/rtc-joined';
   static String callRtcFailed(String id) => '/calls/$id/rtc-failed';
 
+  static const rechargePlans = '/recharge-plans';
+  static const callPricing = '/call-pricing';
   static const wallet = '/wallet';
   static const walletLedger = '/wallet/ledger';
   static const walletEarnings = '/wallet/earnings';
@@ -38,6 +40,8 @@ abstract final class ApiPaths {
   static String payment(String id) => '/payments/$id';
   static String paymentSandboxConfirm(String id) =>
       '/payments/$id/sandbox-confirm';
+  static String paymentVerify(String id) => '/payments/$id/verify';
+  static String paymentAbandon(String id) => '/payments/$id/abandon';
 
   static const conversations = '/conversations';
   static String conversationMessages(String id) =>
@@ -60,6 +64,7 @@ abstract final class ApiPaths {
   static const hostsCompleteness = '/hosts/me/completeness';
   static const hostsDashboard = '/hosts/me/dashboard';
   static const hostsApply = '/hosts/applications';
+  static const hostApplicationDocuments = '/hosts/application-documents';
   static const hostsAvailability = '/hosts/me/availability';
 
   static const adminOverview = '/admin/overview';

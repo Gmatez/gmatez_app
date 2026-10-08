@@ -19,6 +19,7 @@ import '../../../../core/widgets/user_avatar.dart';
 import '../../../auth/presentation/state/auth_notifier.dart';
 import '../../../calls/domain/entities/call_session.dart';
 import '../../../calls/presentation/state/active_call_notifier.dart';
+import '../../../calls/presentation/state/call_rate_provider.dart';
 import '../../../discovery/domain/repositories/discovery_repository.dart';
 import '../../../discovery/presentation/state/discovery_notifier.dart';
 import '../../../profile/domain/entities/user_profile.dart';
@@ -346,7 +347,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ..._hosts.take(5).map(
                     (host) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
-                      child: _OnlineHostTile(host: host),
+                      child: _OnlineHostTile(
+                        host: host,
+                        userRateCents: ref.watch(userCallRateProvider).value,
+                      ),
                     ),
                   ),
               ],
@@ -463,13 +467,14 @@ class _RecentCallTile extends ConsumerWidget {
 }
 
 class _OnlineHostTile extends StatelessWidget {
-  const _OnlineHostTile({required this.host});
+  const _OnlineHostTile({required this.host, this.userRateCents});
 
   final UserProfile host;
+  final int? userRateCents;
 
   @override
   Widget build(BuildContext context) {
-    final rate = host.ratePerMinuteCents;
+    final rate = displayRateCents(host.ratePerMinuteCents, userRateCents);
     final rateLabel = rate > 0
         ? '${(rate / 10).round()} cr/min'
         : 'View rates';

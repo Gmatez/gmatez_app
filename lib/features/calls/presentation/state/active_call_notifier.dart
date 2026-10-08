@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
-
 import '../../../../app/config/app_environment.dart';
 import '../../../../core/calling/call_media_provider.dart';
 import '../../../../core/calling/call_permissions.dart';
@@ -14,7 +13,7 @@ import '../../../../core/realtime/realtime_service.dart';
 import '../../../../core/utils/result.dart';
 import '../../../auth/presentation/state/auth_notifier.dart';
 import '../../data/repositories/call_repository_impl.dart';
-import '../../domain/entities/call_session.dart';
+import '../../domain/entities/call_session.dart';w
 import '../../domain/repositories/call_repository.dart';
 
 final callRepositoryProvider = Provider<CallRepository>((ref) {
@@ -47,6 +46,7 @@ class ActiveCallState {
     this.speakerOn = true,
     this.mediaState = CallMediaConnectionState.idle,
     this.permissionMessage,
+    this.callScreenHidden = false,
   });
 
   final CallSession? incoming;
@@ -57,6 +57,7 @@ class ActiveCallState {
   final bool speakerOn;
   final CallMediaConnectionState mediaState;
   final String? permissionMessage;
+  final bool callScreenHidden;
 
   ActiveCallState copyWith({
     CallSession? incoming,
@@ -67,6 +68,7 @@ class ActiveCallState {
     bool? speakerOn,
     CallMediaConnectionState? mediaState,
     String? permissionMessage,
+    bool? callScreenHidden,
     bool clearIncoming = false,
     bool clearActive = false,
     bool clearPermission = false,
@@ -82,6 +84,7 @@ class ActiveCallState {
       permissionMessage: clearPermission
           ? null
           : permissionMessage ?? this.permissionMessage,
+      callScreenHidden: callScreenHidden ?? this.callScreenHidden,
     );
   }
 }
@@ -133,7 +136,7 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
       for (final call in value.items) {
         if (!call.status.isTerminal &&
             (call.callerId == me || call.calleeId == me)) {
-          state = state.copyWith(active: call);
+          state = state.copyWith(active: call, callScreenHidden: false);
           if (call.status == CallStatus.accepted ||
               call.status == CallStatus.connecting ||
               call.status == CallStatus.connected) {
@@ -166,7 +169,11 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
     );
     state = state.copyWith(busy: false);
     if (result case Success(:final value)) {
-      state = state.copyWith(active: value, clearIncoming: true);
+      state = state.copyWith(
+        active: value,
+        clearIncoming: true,
+        callScreenHidden: false,
+      );
     }
     return result;
   }
@@ -196,7 +203,7 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
     final result = await _calls.accept(incoming.id);
     state = state.copyWith(busy: false, clearIncoming: true);
     if (result case Success(:final value)) {
-      state = state.copyWith(active: value);
+      state = state.copyWith(active: value, callScreenHidden: false);
       await _ensureRtcJoined(value, prefer: value.rtc);
       _startHeartbeat(value.id);
     }
@@ -236,6 +243,14 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
     } finally {
       _ending = false;
     }
+  }
+
+  void showCallScreen() {
+    state = state.copyWith(callScreenHidden: false);
+  }
+
+  void hideCallScreen() {
+    state = state.copyWith(callScreenHidden: true);
   }
 
   Future<void> toggleMute() async {
@@ -295,15 +310,17 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
     }
 
     if (current.status == next.status) {
-      state = state.copyWith(
-        active: current.copyWith(
-          billedSeconds: next.billedSeconds,
-          billedAmountCents: next.billedAmountCents,
-          connectedAt: next.connectedAt,
-          endedAt: next.endedAt,
-          endReason: next.endReason,
-        ),
+      final updated = current.copyWith(
+        billedSeconds: next.billedSeconds,
+        billedAmountCents: next.billedAmountCents,
+        connectedAt: next.connectedAt,
+        endedAt: next.endedAt,
+        endReason: next.endReason,
       );
+      state = state.copyWith(active: updated);
+      if (_needsMediaJoin(updated)) {
+        unawaited(_ensureRtcJoined(updated));
+      }
       return;
     }
     if (!CallStateMachine.canTransition(current.status, next.status) &&
@@ -358,38 +375,72 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
     }
   }
 
+  bool _needsMediaJoin(CallSession call) {
+    if (call.status.isTerminal ||
+        call.status == CallStatus.ringing ||
+        call.status == CallStatus.initiated) {
+      return false;
+    }
+    return state.mediaState != CallMediaConnectionState.connected ||
+        call.status != CallStatus.connected;
+  }
+
+  bool _usableRtc(CallRtcCredentials? creds) {
+    if (creds == null) {
+      return false;
+    }
+    return creds.appId.isNotEmpty &&
+        creds.channelName.isNotEmpty &&
+        creds.token.isNotEmpty &&
+        creds.uid > 0;
+  }
+
+  /// Caller always mints a token from `/rtc-token`.
+  /// Callee uses `rtc` from accept when it already has a real token.
+  Future<CallRtcCredentials?> _resolveRtcCredentials(
+    CallSession call, {
+    CallRtcCredentials? prefer,
+  }) async {
+    final isCaller = _myId != null && _myId == call.callerId;
+    if (!isCaller && _usableRtc(prefer)) {
+      return prefer;
+    }
+    final tokenResult = await _calls.rtcToken(call.id);
+    if (tokenResult case Success(:final value)) {
+      if (_usableRtc(value)) {
+        return value;
+      }
+      await _failRtc('rtc_token_missing');
+      return null;
+    } else if (tokenResult case Failure(:final failure)) {
+      await _failRtc(failure.code ?? 'rtc_token_failed');
+      return null;
+    }
+    return null;
+  }
+
   Future<void> _ensureRtcJoined(
     CallSession call, {
     CallRtcCredentials? prefer,
   }) async {
-    if (_joiningMedia || call.status.isTerminal) {
-      return;
-    }
-    if (call.status == CallStatus.ringing ||
-        call.status == CallStatus.initiated) {
-      return;
-    }
-
-    final permitted = await _ensurePermissions(video: call.isVideo);
-    if (!permitted) {
-      await _failRtc('permission_denied');
+    if (_joiningMedia || !_needsMediaJoin(call)) {
       return;
     }
 
     _joiningMedia = true;
     try {
-      CallRtcCredentials? creds = prefer ?? call.rtc;
-      if (creds == null || creds.token.isEmpty) {
-        final tokenResult = await _calls.rtcToken(call.id);
-        if (tokenResult case Success(:final value)) {
-          creds = value;
-        } else if (tokenResult case Failure(:final failure)) {
-          await _failRtc(failure.code ?? 'rtc_token_failed');
-          return;
-        }
+      if (!call.isMockProvider && _media.name != 'agora') {
+        await _failRtc('agora_media_required');
+        return;
       }
-      if (creds == null || creds.token.isEmpty) {
-        await _failRtc('rtc_token_missing');
+      final permitted = await _ensurePermissions(video: call.isVideo);
+      if (!permitted) {
+        await _failRtc('permission_denied');
+        return;
+      }
+
+      final creds = await _resolveRtcCredentials(call, prefer: prefer);
+      if (creds == null) {
         return;
       }
 
@@ -400,8 +451,15 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
         uid: creds.uid,
         video: call.isVideo,
       );
+      final current = state.active;
+      if (current == null ||
+          current.id != call.id ||
+          current.status.isTerminal) {
+        await _media.leave();
+        return;
+      }
       state = state.copyWith(
-        active: call.copyWith(rtc: creds),
+        active: current.copyWith(rtc: creds),
         cameraEnabled: call.isVideo,
       );
       _scheduleTokenRenewal(call.id, creds.tokenExpiresAt);
@@ -410,6 +468,8 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
         final joined = await _calls.rtcJoined(call.id);
         if (joined case Success(:final value)) {
           state = state.copyWith(active: value.copyWith(rtc: creds));
+        } else if (joined case Failure(:final failure)) {
+          await _failRtc(failure.code ?? 'rtc_joined_failed');
         }
       }
     } catch (_) {
@@ -474,6 +534,7 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
       cameraEnabled: true,
       speakerOn: true,
       mediaState: CallMediaConnectionState.idle,
+      callScreenHidden: false,
       clearPermission: true,
     );
   }

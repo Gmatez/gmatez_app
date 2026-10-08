@@ -10,6 +10,9 @@ class CallRepositoryImpl implements CallRepository {
 
   final ApiClient _client;
 
+  /// Fastify rejects `Content-Type: application/json` with an empty body.
+  static const _emptyJson = <String, dynamic>{};
+
   @override
   Future<Result<CallSession>> create({
     required String calleeId,
@@ -43,42 +46,67 @@ class CallRepositoryImpl implements CallRepository {
 
   @override
   Future<Result<CallSession>> accept(String id) {
-    return _client.post(ApiPaths.callAccept(id), parser: _parse);
+    return _client.post(
+      ApiPaths.callAccept(id),
+      body: _emptyJson,
+      parser: _parse,
+    );
   }
 
   @override
   Future<Result<CallSession>> reject(String id) {
-    return _client.post(ApiPaths.callReject(id), parser: _parse);
+    return _client.post(
+      ApiPaths.callReject(id),
+      body: _emptyJson,
+      parser: _parse,
+    );
   }
 
   @override
   Future<Result<CallSession>> cancel(String id) {
-    return _client.post(ApiPaths.callCancel(id), parser: _parse);
+    return _client.post(
+      ApiPaths.callCancel(id),
+      body: _emptyJson,
+      parser: _parse,
+    );
   }
 
   @override
   Future<Result<CallSession>> end(String id) {
-    return _client.post(ApiPaths.callEnd(id), parser: _parse);
+    return _client.post(
+      ApiPaths.callEnd(id),
+      body: _emptyJson,
+      parser: _parse,
+    );
   }
 
   @override
   Future<Result<void>> heartbeat(String id) {
-    return _client.post(ApiPaths.callHeartbeat(id), parser: (_) {});
+    return _client.post(
+      ApiPaths.callHeartbeat(id),
+      body: _emptyJson,
+      parser: (_) {},
+    );
   }
 
   @override
   Future<Result<CallRtcCredentials>> rtcToken(String id) {
     return _client.post(
       ApiPaths.callRtcToken(id),
+      body: _emptyJson,
       parser: (data) => CallRtcCredentials.fromJson(
-        data is Map<String, dynamic> ? data : const <String, dynamic>{},
+        data is Map ? Map<String, dynamic>.from(data) : const {},
       ),
     );
   }
 
   @override
   Future<Result<CallSession>> rtcJoined(String id) {
-    return _client.post(ApiPaths.callRtcJoined(id), parser: _parse);
+    return _client.post(
+      ApiPaths.callRtcJoined(id),
+      body: _emptyJson,
+      parser: _parse,
+    );
   }
 
   @override

@@ -51,4 +51,23 @@ void main() {
     expect(call.rtc?.channelName, 'gmatez-call-c3');
     expect(call.isMockProvider, isFalse);
   });
+
+  test('parses rtc uid and loosely typed maps from accept', () {
+    final call = CallSession.fromJson(<String, dynamic>{
+      'id': 'c4',
+      'callerId': 'a',
+      'calleeId': 'b',
+      'status': 'CONNECTING',
+      'provider': 'agora',
+      'rtc': <dynamic, dynamic>{
+        'appId': 'app',
+        'channelName': 'gmatez-call-c4',
+        'uid': 2.0,
+        'token': 'tok',
+      },
+    });
+    expect(call.rtc?.uid, 2);
+    expect(call.rtc?.channelName, 'gmatez-call-c4');
+    expect(call.rtc?.token, 'tok');
+  });
 }

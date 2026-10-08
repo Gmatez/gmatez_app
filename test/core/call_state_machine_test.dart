@@ -10,6 +10,17 @@ void main() {
     );
   });
 
+  test('allows ringing to connecting when accepted event is missed', () {
+    expect(
+      CallStateMachine.canTransition(CallStatus.ringing, CallStatus.connecting),
+      isTrue,
+    );
+    expect(
+      CallStateMachine.canTransition(CallStatus.ringing, CallStatus.connected),
+      isTrue,
+    );
+  });
+
   test('rejects ended to connected', () {
     expect(
       CallStateMachine.canTransition(CallStatus.ended, CallStatus.connected),

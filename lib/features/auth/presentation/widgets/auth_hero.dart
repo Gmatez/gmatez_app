@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_tokens.dart';
@@ -10,11 +9,14 @@ class AuthHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.sizeOf(context).height;
-    final heroHeight = (height * 0.30).clamp(200.0, 260.0);
-
-    return SizedBox(
-      height: heroHeight,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final heroHeight = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : (MediaQuery.sizeOf(context).height * 0.46).clamp(240.0, 420.0);
+        return SizedBox(
+          height: heroHeight,
+          width: double.infinity,
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.center,
@@ -44,25 +46,10 @@ class AuthHero extends StatelessWidget {
             ),
           ),
           const FadeInUp(child: _PhoneCard()),
-          Positioned(
-            left: 20,
-            bottom: 16,
-            child: FadeInUp(
-              delay: const Duration(milliseconds: 120),
-              child: Text(
-                'Gmatez',
-                style: GoogleFonts.plusJakartaSans(
-                  color: Colors.white,
-                  fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.6,
-                  height: 1,
-                ),
-              ),
-            ),
-          ),
         ],
       ),
+        );
+      },
     );
   }
 }
@@ -96,11 +83,11 @@ class _PhoneCard extends StatelessWidget {
     return Transform.rotate(
       angle: -0.07,
       child: Container(
-        width: 120,
-        height: 168,
+        width: (MediaQuery.sizeOf(context).width * 0.42).clamp(150.0, 210.0),
+        height: (MediaQuery.sizeOf(context).height * 0.32).clamp(210.0, 280.0),
         padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
-          color: const Color(0xFFEEE9FF),
+          color: AppColors.mist,
           borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
@@ -116,7 +103,7 @@ class _PhoneCard extends StatelessWidget {
             gradient: const LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF8B6CFF), Color(0xFF5536E0)],
+              colors: [AppColors.primarySoft, AppColors.primaryDim],
             ),
           ),
           child: Column(
@@ -138,7 +125,7 @@ class _PhoneCard extends StatelessWidget {
               const Spacer(),
               const CircleAvatar(
                 radius: 20,
-                backgroundColor: Color(0xFFF4F1FF),
+                backgroundColor: AppColors.background,
                 child: Icon(Icons.person, color: AppColors.primary, size: 22),
               ),
               const SizedBox(height: 10),
@@ -165,7 +152,7 @@ class _PhoneCard extends StatelessWidget {
 }
 
 class _CallDot extends StatelessWidget {
-  const _CallDot({required this.icon, this.color = const Color(0xFF2A1570)});
+  const _CallDot({required this.icon, this.color = AppColors.backgroundDeep});
 
   final IconData icon;
   final Color color;

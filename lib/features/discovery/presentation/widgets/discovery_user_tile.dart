@@ -10,8 +10,9 @@ import '../../../../core/utils/result.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../../core/widgets/enterprise_widgets.dart';
 import '../../../../core/widgets/user_avatar.dart';
+import '../../../auth/presentation/state/auth_notifier.dart';
 import '../../../calls/presentation/state/active_call_notifier.dart';
-import '../../../chat/presentation/screens/conversations_screen.dart';
+import '../../../calls/presentation/state/call_rate_provider.dart';
 import '../../../profile/domain/entities/user_profile.dart';
 
 class DiscoveryUserTile extends ConsumerWidget {
@@ -23,7 +24,11 @@ class DiscoveryUserTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final online = user.online || user.availableForCall;
-    final rate = '${(user.ratePerMinuteCents / 10).round()} cr/min';
+    final rateCents = displayRateCents(
+      user.ratePerMinuteCents,
+      ref.watch(userCallRateProvider).value,
+    );
+    final rate = '${(rateCents / 10).round()} cr/min';
 
     return AppCard(
       onTap: onTap,
@@ -101,15 +106,6 @@ class DiscoveryUserTile extends ConsumerWidget {
             children: [
               Expanded(
                 child: AppButton(
-                  label: 'Message',
-                  icon: Icons.chat_bubble_outline_rounded,
-                  variant: AppButtonVariant.ghost,
-                  onPressed: () => _message(context, ref),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: AppButton(
                   label: 'Voice',
                   icon: Icons.call_rounded,
                   variant: AppButtonVariant.secondary,
@@ -135,21 +131,6 @@ class DiscoveryUserTile extends ConsumerWidget {
     );
   }
 
-  Future<void> _message(BuildContext context, WidgetRef ref) async {
-    final result = await ref.read(chatRepositoryProvider).open(user.userId);
-    if (!context.mounted) {
-      return;
-    }
-    switch (result) {
-      case Success(:final value):
-        await context.push(AppRoutes.chatFor(value.id));
-      case Failure(:final failure):
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(failure.userMessage)));
-    }
-  }
-
   Future<void> _call(
     BuildContext context,
     WidgetRef ref,
@@ -171,7 +152,8 @@ class DiscoveryUserTile extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(failure.userMessage),
-            action: goWallet
+            action: goWallet &&
+                    ref.read(authNotifierProvider).user?.isActiveHost != true
                 ? SnackBarAction(
                     label: 'Top up',
                     onPressed: () => context.push(AppRoutes.wallet),

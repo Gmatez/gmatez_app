@@ -6,7 +6,7 @@ import 'app_environment.dart';
 /// - `ENVIRONMENT` — development | test | staging | production
 /// - `API_BASE_URL` — required for staging/production; optional for local
 /// - `WS_BASE_URL` — optional realtime override
-/// - `CALLING_MEDIA_PROVIDER` — mock | agora
+/// - `CALLING_MEDIA_PROVIDER` — `agora` (default) or `mock` (development/test only)
 ///
 /// Local / development defaults:
 /// - API: `https://gmatez-api.onrender.com/api/v1` (shared staging)
@@ -119,9 +119,9 @@ class AppConfig {
       }
       return kind;
     }
-    if (environment.allowsMockProviders) {
-      return CallingMediaProviderKind.mock;
-    }
+    // Release builds do not read .vscode/launch.json. An empty define used to
+    // select the mock engine while the API was still real Agora, so both
+    // phones showed "On a call" and never joined a channel.
     return CallingMediaProviderKind.agora;
   }
 

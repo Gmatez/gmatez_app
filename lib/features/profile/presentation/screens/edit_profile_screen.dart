@@ -117,6 +117,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final state = ref.watch(myProfileNotifierProvider);
     final profile = state.profile;
 
+    if (state.status == ProfileViewStatus.loading && profile == null) {
+      return const Scaffold(
+        body: ScreenSkeleton.profile(),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Edit profile')),
       body: SingleChildScrollView(
@@ -124,11 +130,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (state.status == ProfileViewStatus.loading && profile == null)
-              const Padding(
-                padding: EdgeInsets.only(bottom: AppSpacing.md),
-                child: LinearProgressIndicator(),
-              ),
             AppTextField(controller: _name, label: 'Display name'),
             const SizedBox(height: AppSpacing.md),
             AppTextField(controller: _bio, label: 'Bio'),

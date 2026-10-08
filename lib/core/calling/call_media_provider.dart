@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/widgets.dart';
+
+import 'call_audio_session.dart';
 
 /// Isolates RTC from call business logic.
 ///
@@ -31,6 +34,9 @@ abstract class CallMediaProvider {
   Future<void> setSpeakerEnabled(bool enabled);
   Future<void> switchCamera();
 
+  /// Fires when the local or remote video view becomes available.
+  Listenable get videoLayout;
+
   Widget? buildLocalPreview();
   Widget? buildRemoteVideo();
 }
@@ -49,6 +55,7 @@ class MockCallMediaProvider implements CallMediaProvider {
   String get name => 'mock';
 
   final _states = StreamController<CallMediaConnectionState>.broadcast();
+  final _layout = ChangeNotifier();
   bool joined = false;
   bool muted = false;
   bool cameraEnabled = false;
@@ -56,6 +63,9 @@ class MockCallMediaProvider implements CallMediaProvider {
 
   @override
   Stream<CallMediaConnectionState> get connectionStates => _states.stream;
+
+  @override
+  Listenable get videoLayout => _layout;
 
   @override
   int? get remoteUid => joined ? 2 : null;
@@ -126,6 +136,7 @@ class AgoraCallMediaProvider implements CallMediaProvider {
   String get name => 'agora';
 
   final _states = StreamController<CallMediaConnectionState>.broadcast();
+  final _layout = _VideoLayoutTick();
   RtcEngine? _engine;
   bool _joining = false;
   bool _joined = false;
@@ -133,9 +144,16 @@ class AgoraCallMediaProvider implements CallMediaProvider {
   String? _appId;
   String? _channelName;
   bool _video = false;
+  Completer<void>? _joinWait;
+  VideoViewController? _localView;
+  VideoViewController? _remoteView;
+  int? _remoteViewUid;
 
   @override
   Stream<CallMediaConnectionState> get connectionStates => _states.stream;
+
+  @override
+  Listenable get videoLayout => _layout;
 
   @override
   int? get remoteUid => _remoteUid;
@@ -148,16 +166,24 @@ class AgoraCallMediaProvider implements CallMediaProvider {
     required int uid,
     required bool video,
   }) async {
-    if (_joined || _joining) {
+    if (_joined && _channelName == channelName && _appId == appId) {
       return;
     }
-    if (appId.isEmpty || channelName.isEmpty || token.isEmpty) {
+    if (_joining) {
+      final pending = _joinWait;
+      if (pending != null) {
+        await pending.future;
+      }
+      return;
+    }
+    if (appId.isEmpty || channelName.isEmpty || token.isEmpty || uid <= 0) {
       throw StateError('Missing Agora RTC credentials from server');
     }
     _joining = true;
     _video = video;
     _appId = appId;
     _channelName = channelName;
+    _joinWait = Completer<void>();
     _states.add(CallMediaConnectionState.connecting);
 
     try {
@@ -176,14 +202,35 @@ class AgoraCallMediaProvider implements CallMediaProvider {
             _joined = true;
             _joining = false;
             _states.add(CallMediaConnectionState.connected);
+            final wait = _joinWait;
+            if (wait != null && !wait.isCompleted) {
+              wait.complete();
+            }
           },
           onUserJoined: (connection, remoteUid, elapsed) {
-            _remoteUid = remoteUid;
+            _bindRemote(remoteUid);
             _states.add(CallMediaConnectionState.connected);
           },
           onUserOffline: (connection, remoteUid, reason) {
             if (_remoteUid == remoteUid) {
               _remoteUid = null;
+              _remoteViewUid = null;
+              final previous = _remoteView;
+              _remoteView = null;
+              unawaited(previous?.dispose());
+              _layout.tick();
+            }
+          },
+          onRemoteVideoStateChanged: (
+            connection,
+            remoteUid,
+            state,
+            reason,
+            elapsed,
+          ) {
+            if (state == RemoteVideoState.remoteVideoStateStarting ||
+                state == RemoteVideoState.remoteVideoStateDecoding) {
+              _bindRemote(remoteUid);
             }
           },
           onConnectionStateChanged: (connection, state, reason) {
@@ -193,7 +240,7 @@ class AgoraCallMediaProvider implements CallMediaProvider {
               case ConnectionStateType.connectionStateConnected:
                 _states.add(CallMediaConnectionState.connected);
               case ConnectionStateType.connectionStateFailed:
-                _states.add(CallMediaConnectionState.failed);
+                _failJoin(StateError('Agora connection failed: $reason'));
               case ConnectionStateType.connectionStateDisconnected:
                 if (_joined) {
                   _states.add(CallMediaConnectionState.reconnecting);
@@ -205,8 +252,8 @@ class AgoraCallMediaProvider implements CallMediaProvider {
             }
           },
           onError: (err, msg) {
-            if (!_joined) {
-              _states.add(CallMediaConnectionState.failed);
+            if (!_joined && _fatalJoinError(err)) {
+              _failJoin(StateError('Agora join failed: $err $msg'));
             }
           },
           onTokenPrivilegeWillExpire: (connection, token) {
@@ -215,11 +262,25 @@ class AgoraCallMediaProvider implements CallMediaProvider {
         ),
       );
 
+      await CallAudioSession.start();
+      await engine.setAudioProfile(
+        profile: AudioProfileType.audioProfileSpeechStandard,
+        scenario: AudioScenarioType.audioScenarioChatroom,
+      );
       await engine.enableAudio();
       await engine.setDefaultAudioRouteToSpeakerphone(true);
       if (video) {
         await engine.enableVideo();
+        _localView = VideoViewController(
+          rtcEngine: engine,
+          useAndroidSurfaceView: Platform.isAndroid,
+          canvas: const VideoCanvas(
+            uid: 0,
+            renderMode: RenderModeType.renderModeHidden,
+          ),
+        );
         await engine.startPreview();
+        _layout.tick();
       } else {
         await engine.disableVideo();
       }
@@ -236,12 +297,82 @@ class AgoraCallMediaProvider implements CallMediaProvider {
           autoSubscribeVideo: video,
         ),
       );
+      await _joinWait!.future.timeout(
+        const Duration(seconds: 20),
+        onTimeout: () {
+          throw TimeoutException('Agora channel join timed out');
+        },
+      );
+      _joinWait = null;
+      try {
+        await engine.setEnableSpeakerphone(true);
+        await engine.muteAllRemoteAudioStreams(false);
+        if (video) {
+          await engine.muteAllRemoteVideoStreams(false);
+          await engine.updateChannelMediaOptions(
+            const ChannelMediaOptions(
+              publishMicrophoneTrack: true,
+              publishCameraTrack: true,
+              autoSubscribeAudio: true,
+              autoSubscribeVideo: true,
+            ),
+          );
+        }
+      } catch (_) {
+        // Join already succeeded. A speaker-route failure must not drop media.
+      }
     } catch (e) {
       _joining = false;
       _states.add(CallMediaConnectionState.failed);
       await leave();
       rethrow;
     }
+  }
+
+  void _bindRemote(int remoteUid) {
+    final engine = _engine;
+    final channel = _channelName;
+    if (engine == null || channel == null || remoteUid <= 0) {
+      return;
+    }
+    _remoteUid = remoteUid;
+    if (_remoteView != null && _remoteViewUid == remoteUid) {
+      _layout.tick();
+      return;
+    }
+    final previous = _remoteView;
+    _remoteViewUid = remoteUid;
+    _remoteView = VideoViewController.remote(
+      rtcEngine: engine,
+      useAndroidSurfaceView: Platform.isAndroid,
+      canvas: VideoCanvas(
+        uid: remoteUid,
+        renderMode: RenderModeType.renderModeHidden,
+      ),
+      connection: RtcConnection(channelId: channel),
+    );
+    if (previous != null) {
+      unawaited(previous.dispose());
+    }
+    _layout.tick();
+  }
+
+  bool _fatalJoinError(ErrorCodeType err) {
+    return err == ErrorCodeType.errInvalidToken ||
+        err == ErrorCodeType.errInvalidAppId ||
+        err == ErrorCodeType.errTokenExpired ||
+        err == ErrorCodeType.errJoinChannelRejected ||
+        err == ErrorCodeType.errInvalidChannelName ||
+        err == ErrorCodeType.errNotInitialized ||
+        err == ErrorCodeType.errNoPermission;
+  }
+
+  void _failJoin(Object error) {
+    final wait = _joinWait;
+    if (wait != null && !wait.isCompleted) {
+      wait.completeError(error);
+    }
+    _states.add(CallMediaConnectionState.failed);
   }
 
   @override
@@ -255,12 +386,27 @@ class AgoraCallMediaProvider implements CallMediaProvider {
 
   @override
   Future<void> leave() async {
+    await CallAudioSession.stop();
     final engine = _engine;
+    final wait = _joinWait;
     _engine = null;
+    _joinWait = null;
     _joined = false;
     _joining = false;
     _remoteUid = null;
     _channelName = null;
+    final localView = _localView;
+    final remoteView = _remoteView;
+    _localView = null;
+    _remoteView = null;
+    _remoteViewUid = null;
+    unawaited(localView?.dispose());
+    unawaited(remoteView?.dispose());
+    _layout.tick();
+    if (wait != null && !wait.isCompleted) {
+      wait.future.ignore();
+      wait.completeError(StateError('Left channel before Agora join finished'));
+    }
     if (engine != null) {
       try {
         await engine.leaveChannel();
@@ -295,33 +441,30 @@ class AgoraCallMediaProvider implements CallMediaProvider {
 
   @override
   Widget? buildLocalPreview() {
-    final engine = _engine;
-    final appId = _appId;
-    if (engine == null || appId == null || !_video) {
+    final controller = _localView;
+    if (controller == null || !_video) {
       return null;
     }
     return AgoraVideoView(
-      controller: VideoViewController(
-        rtcEngine: engine,
-        canvas: const VideoCanvas(uid: 0),
-      ),
+      key: const ValueKey('gmatez-local-video'),
+      controller: controller,
     );
   }
 
   @override
   Widget? buildRemoteVideo() {
-    final engine = _engine;
-    final remote = _remoteUid;
-    final channel = _channelName;
-    if (engine == null || remote == null || channel == null || !_video) {
+    final controller = _remoteView;
+    final uid = _remoteViewUid;
+    if (controller == null || uid == null || !_video) {
       return null;
     }
     return AgoraVideoView(
-      controller: VideoViewController.remote(
-        rtcEngine: engine,
-        canvas: VideoCanvas(uid: remote),
-        connection: RtcConnection(channelId: channel),
-      ),
+      key: ValueKey('gmatez-remote-video-$uid'),
+      controller: controller,
     );
   }
+}
+
+class _VideoLayoutTick extends ChangeNotifier {
+  void tick() => notifyListeners();
 }

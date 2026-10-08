@@ -62,6 +62,9 @@ abstract final class AppTheme {
         bodyColor: AppColors.textPrimary,
         displayColor: AppColors.textPrimary,
       ),
+      actionIconTheme: ActionIconThemeData(
+        backButtonIconBuilder: (context) => const Icon(Icons.arrow_back_ios),
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.background.withValues(alpha: 0.92),
         foregroundColor: AppColors.textPrimary,
@@ -88,7 +91,7 @@ abstract final class AppTheme {
         backgroundColor: AppColors.surfaceElevated,
         elevation: 0,
         height: 72,
-        indicatorColor: AppColors.surfaceMuted,
+        indicatorColor: AppColors.primary.withValues(alpha: 0.14),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return GoogleFonts.plusJakartaSans(
@@ -156,7 +159,8 @@ abstract final class AppTheme {
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.onPrimary,
           disabledBackgroundColor: AppColors.border,
-          elevation: 0,
+          elevation: 2,
+          shadowColor: AppColors.primary.withValues(alpha: 0.28),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadii.sm),
           ),

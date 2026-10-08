@@ -8,17 +8,66 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../state/active_call_notifier.dart';
 
-class IncomingCallHost extends ConsumerWidget {
+class IncomingCallHost extends ConsumerStatefulWidget {
   const IncomingCallHost({super.key, required this.child});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<IncomingCallHost> createState() => _IncomingCallHostState();
+}
+
+class _IncomingCallHostState extends ConsumerState<IncomingCallHost> {
+  String? _openedCallId;
+
+  void _openCallScreen(String callId) {
+    if (_openedCallId == callId || callId.isEmpty) {
+      return;
+    }
+    final router = GoRouter.maybeOf(context);
+    if (router == null) {
+      return;
+    }
+    final path = router.state.uri.path;
+    if (path == AppRoutes.callFor(callId) || path.startsWith('/call/$callId')) {
+      _openedCallId = callId;
+      return;
+    }
+    _openedCallId = callId;
+    router.push(AppRoutes.callFor(callId));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen(activeCallProvider, (previous, next) {
+      final active = next.active;
+      if (active == null ||
+          active.status.isTerminal ||
+          next.callScreenHidden) {
+        _openedCallId = null;
+        return;
+      }
+      final callId = active.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        final current = ref.read(activeCallProvider);
+        final open = current.active;
+        if (open == null ||
+            open.id != callId ||
+            open.status.isTerminal ||
+            current.callScreenHidden) {
+          return;
+        }
+        _openCallScreen(callId);
+      });
+    });
+
     final incoming = ref.watch(activeCallProvider).incoming;
     return Stack(
       children: [
-        child,
+        widget.child,
         if (incoming != null)
           Positioned.fill(
             child: Material(
@@ -101,9 +150,9 @@ class IncomingCallHost extends ConsumerWidget {
                                     .read(activeCallProvider.notifier)
                                     .acceptIncoming();
                                 if (result.isSuccess && context.mounted) {
-                                  await context.push(
-                                    AppRoutes.callFor(incoming.id),
-                                  );
+                                  ref
+                                      .read(activeCallProvider.notifier)
+                                      .showCallScreen();
                                 }
                               });
                             },

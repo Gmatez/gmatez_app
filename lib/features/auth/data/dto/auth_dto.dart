@@ -81,19 +81,21 @@ class AuthUserDto {
 
   factory AuthUserDto.fromJson(Map<String, dynamic> json) {
     final profile = json['profile'];
-    final hostJson = json['host'];
+    final hostJson = json['host'] ?? json['hostProfile'];
+    final hostMap = hostJson is Map
+        ? Map<String, dynamic>.from(hostJson)
+        : null;
+    final profileMap = profile is Map
+        ? Map<String, dynamic>.from(profile)
+        : null;
     return AuthUserDto(
       id: json['id'] as String,
       email: json['email'] as String,
       role: json['role'] as String? ?? 'USER',
       status: json['status'] as String? ?? 'ACTIVE',
-      displayName: profile is Map<String, dynamic>
-          ? profile['displayName'] as String?
-          : null,
+      displayName: profileMap?['displayName'] as String?,
       phone: json['phone'] as String?,
-      host: hostJson is Map<String, dynamic>
-          ? HostSnapshot.fromJson(hostJson)
-          : null,
+      host: hostMap == null ? null : HostSnapshot.fromJson(hostMap),
     );
   }
 

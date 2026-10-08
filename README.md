@@ -75,7 +75,7 @@ Hosts: Dashboard, Earnings, Calls, Chat, Profile, call settings, payouts.
 
 Admins: `/admin` console (hosts, users, payouts, reports) plus Swagger at `/api/v1/docs`.
 
-Calling UI starts a real backend call. Wallet purchase uses payment intents; mock sandbox confirm is **non-production + PAYMENT_PROVIDER=mock only**. Agora remote A/V requires `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE`.
+Calling UI starts a real backend call. Wallet purchase uses payment intents. With `PAYMENT_PROVIDER=mock` (non-production only) the app confirms through the sandbox endpoint. With `PAYMENT_PROVIDER=razorpay` the app opens Razorpay Checkout using the public key id from the intent, then `POST /payments/:id/verify`. The key secret never ships in the app. A checkout callback is not a wallet credit until the server reports `SUCCEEDED`. Agora remote A/V requires `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE`.
 
 See `docs/backend-contract.md`.
 

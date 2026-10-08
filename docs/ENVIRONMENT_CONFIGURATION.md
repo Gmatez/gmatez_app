@@ -38,7 +38,7 @@ CORS_ORIGINS=https://app.example.com
 OTP_PROVIDER=mock|sms
 SMS_PROVIDER=msg91|twilio   # required when OTP_PROVIDER=sms
 CALLING_PROVIDER=mock|agora
-PAYMENT_PROVIDER=mock|stripe
+PAYMENT_PROVIDER=mock|stripe|razorpay
 PUSH_PROVIDER=mock|fcm
 ```
 
@@ -69,10 +69,11 @@ When `OTP_PROVIDER=sms` + `SMS_PROVIDER=twilio`:
 
 Missing SMS credentials with `OTP_PROVIDER=sms` → **startup failure**. Never silent mock fallback.
 
-**Other providers:** `sms` / `agora` / `stripe` / `fcm` adapters exist; Agora token mint / Stripe SDK / FCM Admin remain later phases. Production still requires non-mock names + required secrets so misconfiguration cannot silently fall back to mock.
+**Other providers:** Production requires non-mock names and their secrets. There is no silent fallback to mock.
 
 When `CALLING_PROVIDER=agora`: `AGORA_APP_ID`, `AGORA_APP_CERTIFICATE` required.
 When `PAYMENT_PROVIDER=stripe` in production: `STRIPE_SECRET_KEY` required.
+When `PAYMENT_PROVIDER=razorpay` in every environment: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET` are required. The key secret and webhook secret stay on the server. `PLATFORM_CURRENCY` defaults to `INR`. Put values in `.env`, not in source. Webhook URL: `POST /api/v1/payments/webhooks/razorpay`. See `gmatez_backend/docs/architecture/razorpay.md`.
 When `PUSH_PROVIDER=fcm` in production: `FIREBASE_SERVICE_ACCOUNT_JSON` required.
 
 ### LOCAL (development)
@@ -107,7 +108,11 @@ NODE_ENV=staging
 # Prefer sandbox credentials with real provider names, e.g.:
 OTP_PROVIDER=sms
 CALLING_PROVIDER=agora
-PAYMENT_PROVIDER=stripe
+PAYMENT_PROVIDER=razorpay
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+RAZORPAY_WEBHOOK_SECRET=
+PLATFORM_CURRENCY=INR
 PUSH_PROVIDER=fcm
 # OR explicit staging sandbox with mocks:
 ALLOW_MOCK_PROVIDERS=true
@@ -127,11 +132,14 @@ MSG91_AUTH_KEY=...
 MSG91_TEMPLATE_ID=...
 MSG91_SENDER_ID=...
 CALLING_PROVIDER=agora
-PAYMENT_PROVIDER=stripe
+PAYMENT_PROVIDER=razorpay
+RAZORPAY_KEY_ID=...
+RAZORPAY_KEY_SECRET=...
+RAZORPAY_WEBHOOK_SECRET=...
+PLATFORM_CURRENCY=INR
 PUSH_PROVIDER=fcm
 AGORA_APP_ID=...
 AGORA_APP_CERTIFICATE=...
-STRIPE_SECRET_KEY=...
 FIREBASE_SERVICE_ACCOUNT_JSON=...
 ```
 

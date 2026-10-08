@@ -15,6 +15,7 @@ import '../../../../app/theme/app_layout.dart';
 import '../../../../core/motion/app_motion.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../auth/presentation/state/auth_notifier.dart';
+import '../../../calls/presentation/state/active_call_notifier.dart';
 
 class HostDashboardScreen extends ConsumerStatefulWidget {
   const HostDashboardScreen({super.key});
@@ -107,7 +108,8 @@ class _HostDashboardScreenState extends ConsumerState<HostDashboardScreen> {
     final name = ref.watch(authNotifierProvider).user?.displayName ?? 'Listener';
 
     return MistScaffold(
-      body: AsyncBody(
+      body: SafeArea(
+        child: AsyncBody(
         loading: _loading,
         error: _error,
         onRetry: _load,
@@ -118,7 +120,7 @@ class _HostDashboardScreenState extends ConsumerState<HostDashboardScreen> {
             context,
             child: ListView(
               padding: AppLayout.pagePadding(context).copyWith(
-                top: 16,
+                top: 8,
                 bottom: 28,
               ),
               children: [
@@ -135,7 +137,13 @@ class _HostDashboardScreenState extends ConsumerState<HostDashboardScreen> {
                 _CompletenessCard(completeness: asMap(_data?['completeness'])),
                 const SizedBox(height: 12),
               ],
-              Container(
+              GestureDetector(
+                onTap: availability == 'BUSY'
+                    ? () => ref
+                          .read(activeCallProvider.notifier)
+                          .showCallScreen()
+                    : null,
+                child: Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(22),
@@ -171,7 +179,7 @@ class _HostDashboardScreenState extends ConsumerState<HostDashboardScreen> {
                           : availability == 'PAUSED'
                           ? 'You are temporarily unavailable for new calls.'
                           : availability == 'BUSY'
-                          ? 'Availability will restore when the call ends.'
+                          ? 'Tap to open the call. Availability returns when it ends.'
                           : 'Go online when you are ready to take calls.',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.86),
@@ -211,6 +219,7 @@ class _HostDashboardScreenState extends ConsumerState<HostDashboardScreen> {
                     ],
                   ],
                 ),
+              ),
               ),
               const SizedBox(height: 18),
               Row(
@@ -270,11 +279,6 @@ class _HostDashboardScreenState extends ConsumerState<HostDashboardScreen> {
                     icon: Icons.tune_rounded,
                     label: 'Rates',
                     onTap: () => context.push(AppRoutes.hostCallSettings),
-                  ),
-                  _ToolChip(
-                    icon: Icons.chat_bubble_outline_rounded,
-                    label: 'Messages',
-                    onTap: () => context.go(AppRoutes.messages),
                   ),
                   _ToolChip(
                     icon: Icons.person_outline_rounded,
@@ -337,6 +341,7 @@ class _HostDashboardScreenState extends ConsumerState<HostDashboardScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

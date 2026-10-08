@@ -198,20 +198,23 @@ See `docs/AGORA_RTC_ARCHITECTURE.md`.
 
 ## Wallet / payments (CURRENT)
 
-Amounts are **integer cents**. Flutter never credits locally.
+Amounts are **integer minor units** (paise when `currency` is INR, cents when USD). Flutter never credits locally.
 
 | Method | Path | Notes |
 | --- | --- | --- |
 | GET | `/wallet` | balances |
 | GET | `/wallet/ledger` | cursor |
 | GET | `/wallet/earnings` | host totals |
-| POST | `/payments/intents` | `{ amountCents, idempotencyKey }` |
-| GET | `/payments/:id` | own only |
-| POST | `/payments/:id/sandbox-confirm` | **TEST/DEV ONLY** when `PAYMENT_PROVIDER=mock` and mocks allowed. Production → 404. Same path as webhook credit. |
+| POST | `/payments/intents` | Razorpay: `{ rechargePlanId, idempotencyKey }`. Mock may still send `amountCents`. |
+| POST | `/payments/:id/verify` | Razorpay checkout signature. Credits only after server verification. |
+| POST | `/payments/:id/abandon` | Checkout dismissed. Recovers a capture if Razorpay already paid the order. |
+| GET | `/payments/:id` | own only. Razorpay response includes public `checkout.keyId`, never the key secret. |
+| POST | `/payments/webhooks/razorpay` | Raw-body `X-Razorpay-Signature`. |
+| POST | `/payments/:id/sandbox-confirm` | **TEST/DEV ONLY** when `PAYMENT_PROVIDER=mock` and mocks allowed. Production → 404. |
 
-Authority: provider webhook / verified event → wallet credit. Flutter success UI is not proof of payment.
+Authority: verified Razorpay payment or mock webhook → wallet credit. Flutter success UI is not proof of payment.
 
-**PAYMENT_PROVIDER:** `mock` \| `stripe`. Real Stripe SDK / Razorpay PLANNED (Phase 7).
+**PAYMENT_PROVIDER:** `mock` \| `stripe` \| `razorpay`. Razorpay requires `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`. Host bank payouts are not sent; RazorpayX is CONFIG_REQUIRED.
 
 ## Hosts (CURRENT)
 

@@ -107,6 +107,13 @@ void main() {
           environment: AppEnvironment.development,
           mediaName: '',
         ),
+        CallingMediaProviderKind.agora,
+      );
+      expect(
+        AppConfig.resolveCallingMediaProvider(
+          environment: AppEnvironment.development,
+          mediaName: 'mock',
+        ),
         CallingMediaProviderKind.mock,
       );
     });

@@ -11,9 +11,15 @@ String formatPhone(String? phone) {
   return phone;
 }
 
-String formatCents(int? cents) {
-  final value = (cents ?? 0) / 100;
-  return '\$${value.toStringAsFixed(2)}';
+String formatCents(int? minor, {String currency = 'USD'}) {
+  final value = (minor ?? 0) / 100;
+  final amount = value.toStringAsFixed(2);
+  switch (currency.toUpperCase()) {
+    case 'INR':
+      return '₹$amount';
+    default:
+      return '\$$amount';
+  }
 }
 
 int asInt(dynamic value, [int fallback = 0]) {

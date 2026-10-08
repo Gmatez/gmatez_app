@@ -36,6 +36,18 @@ class PromoBanner {
   }
 }
 
+/// Single banner uses the full content width. Several banners peek so swiping stays obvious.
+double promoBannerCardWidth({required double maxWidth, required int count}) {
+  if (count <= 1) {
+    return maxWidth;
+  }
+  final peeked = maxWidth - 36;
+  if (peeked < 200) {
+    return maxWidth;
+  }
+  return peeked;
+}
+
 /// Horizontal promo strip for the home screen (safe inside a vertical ListView).
 class PromoBannerCarousel extends StatefulWidget {
   const PromoBannerCarousel({super.key, required this.banners});
@@ -67,18 +79,24 @@ class _PromoBannerCarouselState extends State<PromoBannerCarousel> {
     context.push(link);
   }
 
-  double _cardWidth(BuildContext context) {
-    final maxW = MediaQuery.sizeOf(context).width;
-    return (maxW * 0.82).clamp(260.0, 360.0);
-  }
-
   @override
   Widget build(BuildContext context) {
     if (widget.banners.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final cardW = _cardWidth(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardW = promoBannerCardWidth(
+          maxWidth: constraints.maxWidth,
+          count: widget.banners.length,
+        );
+        return _buildStrip(cardW);
+      },
+    );
+  }
+
+  Widget _buildStrip(double cardW) {
     final showDots = widget.banners.length > 1;
 
     return FadeInUp(
@@ -173,16 +191,6 @@ class _BannerCard extends StatelessWidget {
                     end: Alignment.bottomRight,
                     colors: AppColors.creditGradient,
                   ),
-            image: hasImage
-                ? DecorationImage(
-                    image: CachedNetworkImageProvider(banner.imageUrl!),
-                    fit: BoxFit.cover,
-                    colorFilter: ColorFilter.mode(
-                      Colors.black.withValues(alpha: 0.35),
-                      BlendMode.darken,
-                    ),
-                  )
-                : null,
             boxShadow: [
               BoxShadow(
                 color: AppColors.primary.withValues(alpha: 0.18),
@@ -191,7 +199,49 @@ class _BannerCard extends StatelessWidget {
               ),
             ],
           ),
-          child: Padding(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (hasImage)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                  child: CachedNetworkImage(
+                    imageUrl: banner.imageUrl!,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                    placeholder: (_, _) => const ColoredBox(
+                      color: AppColors.surfaceMuted,
+                      child: Center(
+                        child: SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    ),
+                    errorWidget: (_, _, _) => const ColoredBox(
+                      color: Color(0xFF1E293B),
+                      child: Center(
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (hasImage)
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x22000000), Color(0x99000000)],
+                    ),
+                  ),
+                ),
+              Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,6 +291,8 @@ class _BannerCard extends StatelessWidget {
                   ),
               ],
             ),
+              ),
+            ],
           ),
         ),
       ),

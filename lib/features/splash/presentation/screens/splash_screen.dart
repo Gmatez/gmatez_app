@@ -37,10 +37,11 @@ class SplashScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.graphic_eq_rounded,
-                        color: Colors.white,
-                        size: 44,
+                      child: Image.asset(
+                        'assets/brand/gmatez_logo.png',
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),

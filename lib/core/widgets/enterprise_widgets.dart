@@ -72,11 +72,15 @@ class EnterpriseListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    final tile = Material(
       color: AppColors.surfaceElevated,
+      elevation: 1,
+      shadowColor: AppColors.softShadow,
       borderRadius: BorderRadius.circular(AppRadii.sm),
       child: InkWell(
         onTap: onTap,
+        splashColor: AppColors.primary.withValues(alpha: 0.08),
+        highlightColor: AppColors.primary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(AppRadii.sm),
         child: Container(
           padding: EdgeInsets.symmetric(
@@ -131,6 +135,7 @@ class EnterpriseListTile extends StatelessWidget {
         ),
       ),
     );
+    return tile;
   }
 }
 

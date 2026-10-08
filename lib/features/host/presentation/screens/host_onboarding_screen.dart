@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +20,7 @@ import '../../../discovery/presentation/state/discovery_notifier.dart';
 import '../../../profile/domain/entities/user_profile.dart';
 import '../../../profile/presentation/state/profile_notifier.dart';
 import '../state/host_onboarding_notifier.dart';
+import '../widgets/host_identity_step.dart';
 
 class HostOnboardingScreen extends ConsumerStatefulWidget {
   const HostOnboardingScreen({super.key});
@@ -31,6 +35,13 @@ class _HostOnboardingScreenState extends ConsumerState<HostOnboardingScreen> {
   final _name = TextEditingController();
   final _bio = TextEditingController();
   final _language = TextEditingController(text: 'en');
+  final _identityNumber = TextEditingController();
+  Uint8List? _frontBytes;
+  Uint8List? _backBytes;
+  Uint8List? _profileBytes;
+  String _frontMime = 'image/jpeg';
+  String _backMime = 'image/jpeg';
+  String _profileMime = 'image/jpeg';
   bool _saving = false;
 
   @override
@@ -71,6 +82,7 @@ class _HostOnboardingScreenState extends ConsumerState<HostOnboardingScreen> {
     _name.dispose();
     _bio.dispose();
     _language.dispose();
+    _identityNumber.dispose();
     super.dispose();
   }
 
@@ -108,6 +120,8 @@ class _HostOnboardingScreenState extends ConsumerState<HostOnboardingScreen> {
         }
         return null;
       case 2:
+        return _identityError();
+      case 3:
         if (!draft.voiceEnabled && !draft.videoEnabled) {
           return 'Enable voice or video calls.';
         }
@@ -140,9 +154,54 @@ class _HostOnboardingScreenState extends ConsumerState<HostOnboardingScreen> {
     );
   }
 
+  String? _identityError() {
+    if (_identityNumber.text.trim().length < 4) {
+      return 'Enter your identity card number.';
+    }
+    if (_frontBytes == null) {
+      return 'Add the front of your identity card.';
+    }
+    if (_backBytes == null) {
+      return 'Add the back of your identity card.';
+    }
+    if (_profileBytes == null) {
+      return 'Add a profile image.';
+    }
+    return null;
+  }
+
+  Future<String?> _uploadDocument(
+    String kind,
+    Uint8List bytes,
+    String mime, {
+    String? identityCardNumber,
+  }) async {
+    final result = await ref.read(apiClientProvider).post(
+      ApiPaths.hostApplicationDocuments,
+      body: {
+        'kind': kind,
+        'mime': mime,
+        'dataBase64': base64Encode(bytes),
+        'identityCardNumber': ?identityCardNumber,
+      },
+      parser: (_) {},
+    );
+    if (result case Failure(:final failure)) {
+      return failure.userMessage;
+    }
+    return null;
+  }
+
   Future<void> _submit() async {
     _syncDraftFromFields();
     final draft = ref.read(hostOnboardingProvider);
+    final identityError = _identityError();
+    if (identityError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(identityError)),
+      );
+      return;
+    }
     if (!draft.canSubmit) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -165,6 +224,25 @@ class _HostOnboardingScreenState extends ConsumerState<HostOnboardingScreen> {
     }
 
     setState(() => _saving = true);
+    final uploadError =
+        await _uploadDocument(
+          'identity-front',
+          _frontBytes!,
+          _frontMime,
+          identityCardNumber: _identityNumber.text.trim(),
+        ) ??
+        await _uploadDocument('identity-back', _backBytes!, _backMime) ??
+        await _uploadDocument('profile-image', _profileBytes!, _profileMime);
+    if (!mounted) {
+      return;
+    }
+    if (uploadError != null) {
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(uploadError)),
+      );
+      return;
+    }
     final languageCode = hostLanguageCode(
       draft.languages.isNotEmpty ? draft.languages.first : draft.language,
     );
@@ -245,9 +323,9 @@ class _HostOnboardingScreenState extends ConsumerState<HostOnboardingScreen> {
     final draft = ref.watch(hostOnboardingProvider);
     return MistScaffold(
       appBar: AppBar(
-        title: Text('Step ${draft.step + 1} of 4'),
+        title: Text('Step ${draft.step + 1} of 5'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
+          icon: const Icon(Icons.arrow_back_ios),
           onPressed: () {
             if (draft.step == 0) {
               context.pop();
@@ -264,7 +342,7 @@ class _HostOnboardingScreenState extends ConsumerState<HostOnboardingScreen> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(99),
               child: LinearProgressIndicator(
-                value: (draft.step + 1) / 4,
+                value: (draft.step + 1) / 5,
                 minHeight: 6,
                 color: AppColors.primary,
                 backgroundColor: AppColors.surfaceMuted,
@@ -285,6 +363,34 @@ class _HostOnboardingScreenState extends ConsumerState<HostOnboardingScreen> {
                   onChanged: _draft.patch,
                 ),
                 _LanguagesStep(draft: draft, notifier: _draft),
+                HostIdentityStep(
+                  number: _identityNumber,
+                  uploading: _saving,
+                  images: HostIdentityImages(
+                    front: _frontBytes,
+                    back: _backBytes,
+                    profile: _profileBytes,
+                    frontMime: _frontMime,
+                    backMime: _backMime,
+                    profileMime: _profileMime,
+                  ),
+                  onNumberChanged: (_) => setState(() {}),
+                  onPicked: (slot, bytes, mime) {
+                    setState(() {
+                      switch (slot) {
+                        case 'front':
+                          _frontBytes = bytes;
+                          _frontMime = mime;
+                        case 'back':
+                          _backBytes = bytes;
+                          _backMime = mime;
+                        default:
+                          _profileBytes = bytes;
+                          _profileMime = mime;
+                      }
+                    });
+                  },
+                ),
                 const _VerificationStep(),
                 _AgreementStep(draft: draft, onChanged: _draft.patch),
               ],
@@ -313,11 +419,13 @@ class _HostOnboardingScreenState extends ConsumerState<HostOnboardingScreen> {
                   Expanded(
                     flex: 2,
                     child: AppButton(
-                      label: draft.step == 3
+                      label: draft.step == 4
                           ? (_saving ? 'Submitting…' : 'Submit Application')
                           : 'Continue',
                       loading: _saving,
-                      onPressed: draft.step == 3
+                      onPressed: _saving
+                          ? null
+                          : draft.step == 4
                           ? _submit
                           : () => _go(draft.step + 1),
                     ),
@@ -515,7 +623,7 @@ class _VerificationStep extends ConsumerWidget {
         const ScreenHeader(
           title: 'Rates & call types',
           subtitle:
-              'Set what callers pay per minute. Admin review is required before you go live. No identity documents are uploaded in this app.',
+              'Set what callers pay per minute. Admin review is required before you go live.',
         ),
         const SizedBox(height: AppSpacing.lg),
         AppCard(

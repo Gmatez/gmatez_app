@@ -21,6 +21,9 @@ class CallPermissions {
     if (!mic.isGranted) {
       return CallPermissionResult.denied;
     }
+    try {
+      await Permission.notification.request();
+    } catch (_) {}
     if (!video) {
       return CallPermissionResult.granted;
     }

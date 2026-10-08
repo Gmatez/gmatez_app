@@ -164,6 +164,7 @@ class AppCard extends StatelessWidget {
     this.onTap,
     this.color,
     this.bordered = true,
+    this.highlighted = false,
   });
 
   final Widget child;
@@ -171,24 +172,33 @@ class AppCard extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? color;
   final bool bordered;
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
     final content = AnimatedContainer(
-      duration: AppDurations.fast,
+      duration: AppDurations.normal,
+      curve: Curves.easeOutCubic,
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: color ?? AppColors.surfaceElevated,
+        color: highlighted
+            ? AppColors.mist
+            : color ?? AppColors.surfaceElevated,
         borderRadius: BorderRadius.circular(AppRadii.md),
         border: bordered
-            ? Border.all(color: AppColors.border)
+            ? Border.all(
+                color: highlighted ? AppColors.primary : AppColors.border,
+                width: highlighted ? 1.6 : 1,
+              )
             : null,
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: AppColors.softShadow,
-            blurRadius: 20,
-            offset: Offset(0, 8),
+            color: highlighted
+                ? AppColors.primary.withValues(alpha: 0.16)
+                : AppColors.softShadow,
+            blurRadius: highlighted ? 28 : 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),

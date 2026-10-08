@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
 
-/// Gmatez purple product language (Listener mockups).
+/// Gmatez blue, matched to the product logo.
 abstract final class AppColors {
   // Atmosphere
-  static const background = Color(0xFFF4F1FF);
-  static const backgroundDeep = Color(0xFF2A1570);
-  static const mist = Color(0xFFEDE8FF);
+  static const background = Color(0xFFF5F7FF);
+  static const backgroundDeep = Color(0xFF141A66);
+  static const mist = Color(0xFFEEF0FF);
   static const surface = Color(0xFFFFFFFF);
-  static const surfaceMuted = Color(0xFFEEE9FF);
+  static const surfaceMuted = Color(0xFFE8ECFF);
   static const surfaceElevated = Color(0xFFFFFFFF);
-  static const border = Color(0xFFE4DDF8);
-  static const borderStrong = Color(0xFFC9BFF0);
+  static const border = Color(0xFFD9E0FF);
+  static const borderStrong = Color(0xFFB7C2FF);
 
   // Brand
-  static const primary = Color(0xFF6D4AFF);
-  static const primaryDim = Color(0xFF5536E0);
-  static const primarySoft = Color(0xFF8B6CFF);
-  static const accent = Color(0xFFC084FC);
-  static const accentDim = Color(0xFFA855F7);
-  static const tideGlow = Color(0xFFD8B4FE);
+  static const primary = Color(0xFF3D4FFF);
+  static const primaryDim = Color(0xFF2C3AE0);
+  static const primarySoft = Color(0xFF6D7CFF);
+  static const accent = Color(0xFF7C8CFF);
+  static const accentDim = Color(0xFF2430B8);
+  static const tideGlow = Color(0xFFC7D0FF);
 
   // Semantic
   static const success = Color(0xFF16A34A);
@@ -29,37 +29,37 @@ abstract final class AppColors {
   static const warningSoft = Color(0xFFFEF3C7);
 
   // Text
-  static const textPrimary = Color(0xFF1A1240);
-  static const textSecondary = Color(0xFF6B628C);
-  static const textMuted = Color(0xFF9A92B5);
+  static const textPrimary = Color(0xFF12163A);
+  static const textSecondary = Color(0xFF5C648A);
+  static const textMuted = Color(0xFF8B93B3);
   static const onPrimary = Color(0xFFFFFFFF);
   static const onDeep = Color(0xFFF8F6FF);
   static const onAccent = Color(0xFFFFFFFF);
 
   /// Distinct from brand purple — warm rose shimmer for loading skeletons.
-  static const skeletonBase = Color(0xFFF3E8FF);
-  static const skeletonHighlight = Color(0xFFFFF1F2);
-  static const skeletonMid = Color(0xFFFCE7F3);
+  static const skeletonBase = Color(0xFFE8ECFF);
+  static const skeletonHighlight = Color(0xFFF8F9FF);
+  static const skeletonMid = Color(0xFFDDE3FF);
 
   static const introGradient = [
-    Color(0xFF2A1570),
-    Color(0xFF3B1D9E),
-    Color(0xFF6D4AFF),
-    Color(0xFF8B6CFF),
+    Color(0xFF141A66),
+    Color(0xFF2430B8),
+    Color(0xFF3D4FFF),
+    Color(0xFF6D7CFF),
   ];
 
   static const creditGradient = [
-    Color(0xFF5536E0),
-    Color(0xFF6D4AFF),
-    Color(0xFF8B6CFF),
+    Color(0xFF2430B8),
+    Color(0xFF3D4FFF),
+    Color(0xFF6D7CFF),
   ];
 
   static const heroWash = [
-    Color(0xFFF4F1FF),
-    Color(0xFFEDE8FF),
-    Color(0xFFE4DDF8),
+    Color(0xFFF5F7FF),
+    Color(0xFFEEF0FF),
+    Color(0xFFE4E9FF),
   ];
 
-  static const cardShadow = Color(0x1A2A1570);
-  static const softShadow = Color(0x146D4AFF);
+  static const cardShadow = Color(0x1A141A66);
+  static const softShadow = Color(0x143D4FFF);
 }

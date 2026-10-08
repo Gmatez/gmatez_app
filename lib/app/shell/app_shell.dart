@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,17 +8,103 @@ import '../../features/auth/presentation/state/auth_notifier.dart';
 import '../router/app_routes.dart';
 import '../theme/app_colors.dart';
 
-class AppShell extends ConsumerWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
+  final List<int> _history = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _history.add(widget.navigationShell.currentIndex);
+  }
+
+  @override
+  void didUpdateWidget(AppShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final index = widget.navigationShell.currentIndex;
+    if (_history.isEmpty || _history.last != index) {
+      _history.add(index);
+    }
+  }
+
+  void _openBranch(int branch) {
+    if (_history.isEmpty || _history.last != branch) {
+      _history.add(branch);
+    }
+    widget.navigationShell.goBranch(
+      branch,
+      initialLocation: branch == widget.navigationShell.currentIndex,
+    );
+  }
+
+  void _goBack() {
+    final router = GoRouter.of(context);
+    if (router.canPop()) {
+      router.pop();
+      return;
+    }
+    if (_history.length > 1) {
+      _history.removeLast();
+      widget.navigationShell.goBranch(_history.last);
+      return;
+    }
+    SystemNavigator.pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final navigationShell = widget.navigationShell;
     final isHost = ref.watch(authNotifierProvider).user?.isActiveHost == true;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final shellIndex = navigationShell.currentIndex;
+    final visualIndex = isHost
+        ? (shellIndex <= 1 ? 0 : shellIndex - 1)
+        : shellIndex;
+    final destinations = <NavigationDestination>[
+      NavigationDestination(
+        icon: Icon(isHost ? Icons.dashboard_outlined : Icons.home_outlined),
+        selectedIcon: Icon(isHost ? Icons.dashboard_rounded : Icons.home_rounded),
+        label: isHost ? 'Studio' : 'Home',
+      ),
+      if (!isHost)
+        const NavigationDestination(
+          icon: Icon(Icons.explore_outlined),
+          selectedIcon: Icon(Icons.explore_rounded),
+          label: 'Discover',
+        ),
+      const NavigationDestination(
+        icon: Icon(Icons.call_outlined),
+        selectedIcon: Icon(Icons.call_rounded),
+        label: 'Calls',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.account_balance_wallet_outlined),
+        selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+        label: 'Recharge',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.person_outline_rounded),
+        selectedIcon: Icon(Icons.person_rounded),
+        label: 'Profile',
+      ),
+    ];
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          _goBack();
+        }
+      },
+      child: Scaffold(
       body: navigationShell,
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
@@ -32,47 +119,16 @@ class AppShell extends ConsumerWidget {
           ],
         ),
         child: NavigationBar(
-          selectedIndex: navigationShell.currentIndex,
+          selectedIndex: visualIndex.clamp(0, destinations.length - 1),
           height: 68 + (bottomInset > 0 ? 4 : 0),
           onDestinationSelected: (index) {
-            navigationShell.goBranch(
-              index,
-              initialLocation: index == navigationShell.currentIndex,
-            );
+            final branch = !isHost || index == 0 ? index : index + 1;
+            _openBranch(branch);
           },
-          destinations: [
-            NavigationDestination(
-              icon: Icon(
-                isHost ? Icons.dashboard_outlined : Icons.home_outlined,
-              ),
-              selectedIcon: Icon(
-                isHost ? Icons.dashboard_rounded : Icons.home_rounded,
-              ),
-              label: isHost ? 'Studio' : 'Home',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.explore_outlined),
-              selectedIcon: Icon(Icons.explore_rounded),
-              label: 'Discover',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.call_outlined),
-              selectedIcon: Icon(Icons.call_rounded),
-              label: 'Calls',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.chat_bubble_outline_rounded),
-              selectedIcon: Icon(Icons.chat_bubble_rounded),
-              label: 'Chat',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded),
-              selectedIcon: Icon(Icons.person_rounded),
-              label: 'Profile',
-            ),
-          ],
+          destinations: destinations,
         ),
       ),
+    ),
     );
   }
 }

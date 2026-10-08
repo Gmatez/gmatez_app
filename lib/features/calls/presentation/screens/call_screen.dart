@@ -9,41 +9,22 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/calling/call_media_provider.dart';
 import '../../../../core/calling/call_status.dart';
 import '../../../../core/widgets/user_avatar.dart';
+import '../../../auth/presentation/state/auth_notifier.dart';
 import '../state/active_call_notifier.dart';
 
 class CallScreen extends ConsumerStatefulWidget {
-  const CallScreen({super.key, required this.callId});
+  const CallScreen({super.key, required this.callId, this.embedded = false});
 
   final String callId;
+
+  /// Drawn over the current page. Must not pop the navigator underneath.
+  final bool embedded;
 
   @override
   ConsumerState<CallScreen> createState() => _CallScreenState();
 }
 
 class _CallScreenState extends ConsumerState<CallScreen> {
-  Timer? _ticker;
-  Duration _elapsed = Duration.zero;
-
-  @override
-  void initState() {
-    super.initState();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      final call = ref.read(activeCallProvider).active;
-      if (call?.id != widget.callId || call?.connectedAt == null) {
-        return;
-      }
-      setState(() {
-        _elapsed = DateTime.now().difference(call!.connectedAt!);
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _ticker?.cancel();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     ref.listen(activeCallProvider, (previous, next) {
@@ -51,7 +32,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
           previous?.active?.id == widget.callId &&
           next.active?.id != widget.callId &&
           next.incoming?.id != widget.callId;
-      if (left && context.canPop()) {
+      if (left && !widget.embedded && context.canPop()) {
         context.pop();
       }
     });
@@ -60,22 +41,34 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     final call = state.active?.id == widget.callId ? state.active : null;
     final notifier = ref.read(activeCallProvider.notifier);
     final media = ref.watch(callMediaProvider);
-    final peerName =
-        call?.calleeDisplayName ?? call?.callerDisplayName ?? 'Connecting…';
-    final peerAvatar = call?.calleeAvatarUrl ?? call?.callerAvatarUrl;
+    final me = ref.watch(authNotifierProvider).user?.id;
+    final iAmCaller = me != null && me == call?.callerId;
+    final peerName = iAmCaller
+        ? (call?.calleeDisplayName ?? 'Listener')
+        : (call?.callerDisplayName ?? 'Caller');
+    final peerAvatar = iAmCaller
+        ? call?.calleeAvatarUrl
+        : call?.callerAvatarUrl;
     final status = call?.status ?? CallStatus.initiated;
     final rate = call?.ratePerMinuteCents ?? 0;
     final isVideo = call?.isVideo ?? false;
-    final remoteVideo = isVideo ? media.buildRemoteVideo() : null;
-    final localPreview = isVideo ? media.buildLocalPreview() : null;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDeep,
-      body: Stack(
+      body: ListenableBuilder(
+        listenable: media.videoLayout,
+        builder: (context, _) {
+          final remoteVideo = isVideo ? media.buildRemoteVideo() : null;
+          final localPreview = isVideo && state.cameraEnabled
+              ? media.buildLocalPreview()
+              : null;
+          final mainVideo = remoteVideo ?? localPreview;
+          final pip = remoteVideo != null ? localPreview : null;
+          return Stack(
         fit: StackFit.expand,
         children: [
-          if (remoteVideo != null)
-            Positioned.fill(child: remoteVideo)
+          if (mainVideo != null)
+            Positioned.fill(child: mainVideo)
           else
             const ColoredBox(color: AppColors.backgroundDeep),
           DecoratedBox(
@@ -83,16 +76,25 @@ class _CallScreenState extends ConsumerState<CallScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [
-                  AppColors.backgroundDeep.withValues(alpha: 0.35),
-                  AppColors.backgroundDeep.withValues(alpha: 0.92),
-                  AppColors.backgroundDeep,
-                ],
-                stops: const [0, 0.55, 1],
+                colors: mainVideo == null
+                    ? [
+                        AppColors.backgroundDeep.withValues(alpha: 0.35),
+                        AppColors.backgroundDeep.withValues(alpha: 0.92),
+                        AppColors.backgroundDeep,
+                      ]
+                    : [
+                        AppColors.backgroundDeep.withValues(alpha: 0.45),
+                        Colors.transparent,
+                        Colors.transparent,
+                        AppColors.backgroundDeep.withValues(alpha: 0.82),
+                      ],
+                stops: mainVideo == null
+                    ? const [0, 0.55, 1]
+                    : const [0, 0.22, 0.62, 1],
               ),
             ),
           ),
-          if (localPreview != null && state.cameraEnabled)
+          if (pip != null)
             Positioned(
               right: 16,
               top: 72,
@@ -100,7 +102,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
               height: 160,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: localPreview,
+                child: pip,
               ),
             ),
           SafeArea(
@@ -111,7 +113,12 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                   Row(
                     children: [
                       IconButton(
-                        onPressed: () => context.pop(),
+                        onPressed: () {
+                          notifier.hideCallScreen();
+                          if (!widget.embedded && context.canPop()) {
+                            context.pop();
+                          }
+                        },
                         icon: const Icon(Icons.keyboard_arrow_down_rounded),
                         color: Colors.white,
                       ),
@@ -138,18 +145,17 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                       ),
                     ],
                   ),
-                  if (remoteVideo == null) ...[
+                  if (mainVideo == null) ...[
                     const Spacer(),
                     UserAvatar(name: peerName, imageUrl: peerAvatar, size: 120),
                     const SizedBox(height: 18),
-                  ] else
-                    const Spacer(),
+                  ],
                   Text(
                     peerName,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.onDeep,
-                      fontSize: 28,
+                      fontSize: mainVideo == null ? 28 : 20,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -163,15 +169,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                   ),
                   if (status == CallStatus.connected) ...[
                     const SizedBox(height: 6),
-                    Text(
-                      _formatDuration(_elapsed),
-                      style: const TextStyle(
-                        color: AppColors.tideGlow,
-                        fontSize: 34,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
+                    _CallClock(connectedAt: call?.connectedAt),
                   ],
                   const SizedBox(height: 10),
                   Text(
@@ -252,7 +250,9 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                         color: AppColors.danger,
                         onTap: () async {
                           await notifier.hangUp();
-                          if (context.mounted && context.canPop()) {
+                          if (!widget.embedded &&
+                              context.mounted &&
+                              context.canPop()) {
                             context.pop();
                           }
                         },
@@ -264,6 +264,8 @@ class _CallScreenState extends ConsumerState<CallScreen> {
             ),
           ),
         ],
+      );
+        },
       ),
     );
   }
@@ -287,14 +289,55 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     };
   }
 
-  String _formatDuration(Duration value) {
-    final m = value.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = value.inSeconds.remainder(60).toString().padLeft(2, '0');
-    final h = value.inHours;
-    if (h > 0) {
-      return '$h:$m:$s';
-    }
-    return '$m:$s';
+}
+
+class _CallClock extends StatefulWidget {
+  const _CallClock({required this.connectedAt});
+
+  final DateTime? connectedAt;
+
+  @override
+  State<_CallClock> createState() => _CallClockState();
+}
+
+class _CallClockState extends State<_CallClock> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final started = widget.connectedAt;
+    final elapsed = started == null
+        ? Duration.zero
+        : DateTime.now().difference(started);
+    final m = elapsed.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = elapsed.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final h = elapsed.inHours;
+    final label = h > 0 ? '$h:$m:$s' : '$m:$s';
+    return Text(
+      label,
+      style: const TextStyle(
+        color: AppColors.tideGlow,
+        fontSize: 34,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.2,
+      ),
+    );
   }
 }
 
