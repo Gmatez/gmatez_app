@@ -130,7 +130,7 @@ class AppConfig {
     required AppEnvironment environment,
     required String apiBaseUrl,
   }) {
-    if (environment.allowsMockProviders) {
+    if (environment.isLocal) {
       return;
     }
     if (_isLoopback(apiBaseUrl)) {
