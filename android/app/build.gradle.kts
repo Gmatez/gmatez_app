@@ -34,16 +34,6 @@ android {
         targetSdk = maxOf(flutter.targetSdkVersion, 35)
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-
-        // Agora RTC alone is ~50–90MB per ABI. A "universal" APK packs every
-        // ABI (arm64 + armeabi-v7a + x86_64) → ~240MB. Limit to phone ABIs.
-        // For Play Store prefer: flutter build appbundle (serves one ABI per device).
-        // For a single-device sideload APK: also pass --target-platform=android-arm64
-        ndk {
-            abiFilters.clear()
-            abiFilters.add("arm64-v8a")
-            abiFilters.add("armeabi-v7a")
-        }
     }
 
     signingConfigs {
@@ -63,6 +53,19 @@ android {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")
+            }
+
+            // Agora RTC alone is ~50-90MB per ABI. A "universal" APK packs
+            // every ABI (arm64 + armeabi-v7a + x86_64) -> ~240MB. Limit
+            // release/sideload builds to phone ABIs only. Debug builds keep
+            // Flutter's normal per-device ABI so emulators (x86_64) work.
+            // For Play Store prefer: flutter build appbundle (serves one ABI
+            // per device). For a single-device sideload APK: also pass
+            // --target-platform=android-arm64
+            ndk {
+                abiFilters.clear()
+                abiFilters.add("arm64-v8a")
+                abiFilters.add("armeabi-v7a")
             }
         }
     }
