@@ -20,6 +20,17 @@
       "args": [
         "--dart-define=CALLING_MEDIA_PROVIDER=agora"
       ]
+    },
+    {
+      "name": "Gmatez (Android emulator, local backend)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define=API_BASE_URL=http://10.0.2.2:43121/api/v1",
+        "--dart-define=WS_BASE_URL=http://10.0.2.2:43121/ws",
+        "--dart-define=CALLING_MEDIA_PROVIDER=agora"
+      ]
     }
   ]
 }
