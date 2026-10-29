@@ -26,20 +26,32 @@ class HostIdentityImages {
   final String? profileMime;
 }
 
+const kIdentityDocumentTypes = <String, String>{
+  'AADHAAR': 'Aadhaar',
+  'PAN': 'PAN',
+  'PASSPORT': 'Passport',
+  'DRIVING_LICENCE': 'Driving licence',
+  'VOTER_ID': 'Voter ID',
+};
+
 class HostIdentityStep extends StatelessWidget {
   const HostIdentityStep({
     super.key,
     required this.number,
+    required this.documentType,
     required this.images,
     required this.uploading,
     required this.onNumberChanged,
+    required this.onDocumentTypeChanged,
     required this.onPicked,
   });
 
   final TextEditingController number;
+  final String documentType;
   final HostIdentityImages images;
   final bool uploading;
   final ValueChanged<String> onNumberChanged;
+  final ValueChanged<String> onDocumentTypeChanged;
   final void Function(String slot, Uint8List bytes, String mime) onPicked;
 
   @override
@@ -53,9 +65,25 @@ class HostIdentityStep extends StatelessWidget {
         const ScreenHeader(
           title: 'Identity documents',
           subtitle:
-              'Your identity card number, both sides of the card, and a profile photo are required. An admin still reviews the application.',
+              'Choose the document type, enter the number, and add both sides plus a profile photo. An admin reviews the upload manually.',
         ),
         const SizedBox(height: AppSpacing.lg),
+        DropdownButtonFormField<String>(
+          initialValue: kIdentityDocumentTypes.containsKey(documentType)
+              ? documentType
+              : 'AADHAAR',
+          decoration: const InputDecoration(labelText: 'Document type'),
+          items: [
+            for (final entry in kIdentityDocumentTypes.entries)
+              DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+          ],
+          onChanged: uploading
+              ? null
+              : (value) {
+                  if (value != null) onDocumentTypeChanged(value);
+                },
+        ),
+        const SizedBox(height: AppSpacing.md),
         TextField(
           controller: number,
           enabled: !uploading,
@@ -92,10 +120,34 @@ class HostIdentityStep extends StatelessWidget {
   }
 
   Future<void> _pick(BuildContext context, String slot) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !context.mounted) {
+      return;
+    }
     final file = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
+      source: source,
       maxWidth: 1600,
-      imageQuality: 80,
+      imageQuality: 70,
     );
     if (file == null) {
       return;
@@ -104,9 +156,9 @@ class HostIdentityStep extends StatelessWidget {
     if (!context.mounted) {
       return;
     }
-    if (bytes.length > 1500000) {
+    if (bytes.length > 4000000) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Each image must be under 1.5 MB.')),
+        const SnackBar(content: Text('Each image must be under 4 MB.')),
       );
       return;
     }

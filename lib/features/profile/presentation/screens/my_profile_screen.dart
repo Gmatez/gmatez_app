@@ -14,6 +14,7 @@ import '../../../../core/utils/money.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/widgets/app_widgets.dart';
 import '../../../../core/widgets/user_avatar.dart';
+import '../../../../l10n/app_strings.dart';
 import '../../../auth/presentation/state/auth_notifier.dart';
 import '../../../settings/presentation/screens/legal_screen.dart';
 import '../../../wallet/presentation/screens/wallet_screen.dart';
@@ -60,6 +61,7 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
     final name = profile?.displayName ?? auth?.displayName ?? 'Your profile';
     final phone = formatPhone(auth?.phone);
 
+    final text = AppStrings.of(context);
     return MistScaffold(
       body: AsyncBody(
         loading: state.status == ProfileViewStatus.loading && profile == null,
@@ -77,7 +79,7 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                 bottom: AppSpacing.lg,
               ),
               children: [
-                const ScreenHeader(title: 'Profile'),
+                ScreenHeader(title: text('profile')),
                 FadeInUp(
                   child: AppCard(
                     child: Column(
@@ -106,7 +108,7 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                         ],
                         const SizedBox(height: AppSpacing.md),
                         AppButton(
-                          label: 'Edit profile',
+                          label: text('editProfile'),
                           variant: AppButtonVariant.ghost,
                           expanded: false,
                           onPressed: () => context.push(AppRoutes.editProfile),
@@ -164,12 +166,12 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                   children: [
                     AppMenuTile(
                       icon: Icons.history_rounded,
-                      title: 'Call history',
+                      title: text('callHistory'),
                       onTap: () => context.go(AppRoutes.calls),
                     ),
                     AppMenuTile(
                       icon: Icons.notifications_none_rounded,
-                      title: 'Notifications',
+                      title: text('notifications'),
                       onTap: () => context.push(AppRoutes.notifications),
                     ),
                   ],
@@ -182,7 +184,7 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                   children: [
                     AppMenuTile(
                       icon: Icons.lock_outline_rounded,
-                      title: 'Privacy & security',
+                      title: text('privacy'),
                       onTap: () => context.push(
                         AppRoutes.legal,
                         extra: {
@@ -193,7 +195,7 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                     ),
                     AppMenuTile(
                       icon: Icons.help_outline_rounded,
-                      title: 'Help & support',
+                      title: text('help'),
                       onTap: () => context.push(
                         AppRoutes.legal,
                         extra: {
@@ -204,25 +206,25 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                     ),
                     AppMenuTile(
                       icon: Icons.settings_outlined,
-                      title: 'App settings',
+                      title: text('appSettings'),
                       onTap: () => context.push(AppRoutes.settings),
                     ),
                     if (auth?.isActiveHost == true)
                       AppMenuTile(
                         icon: Icons.headset_mic_outlined,
-                        title: 'Listener dashboard',
+                        title: text('listenerDashboard'),
                         onTap: () => context.push(AppRoutes.hostDashboard),
                       )
                     else if (auth?.isPendingHost == true)
                       AppMenuTile(
                         icon: Icons.hourglass_top_rounded,
-                        title: 'Application status',
+                        title: text('applicationStatus'),
                         onTap: () => context.push(AppRoutes.hostPending),
                       )
                     else
                       AppMenuTile(
                         icon: Icons.headset_mic_outlined,
-                        title: 'Join as listener',
+                        title: text('joinAsListener'),
                         onTap: () => context.push(AppRoutes.hostApply),
                       ),
                   ],
@@ -230,7 +232,7 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                 const SizedBox(height: AppSpacing.sm),
                 AppMenuTile(
                   icon: Icons.logout_rounded,
-                  title: 'Log out',
+                  title: text('logOut'),
                   danger: true,
                   onTap: () => ref.read(authNotifierProvider.notifier).logout(),
                 ),
@@ -242,4 +244,4 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
     );
   }
 }
-
+

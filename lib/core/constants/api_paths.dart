@@ -8,12 +8,14 @@ abstract final class ApiPaths {
   static const authOtpVerify = '/auth/otp/verify';
   static const authPhoneOtpRequest = '/auth/phone/otp/request';
   static const authPhoneOtpVerify = '/auth/phone/otp/verify';
+  static const authPhoneFirebaseVerify = '/auth/phone/firebase/verify';
 
   static const usersMe = '/users/me';
   static const usersHeartbeat = '/users/me/heartbeat';
   static String user(String id) => '/users/$id';
   static const usersMeDelete = '/users/me';
 
+  static const profileAvatar = '/profiles/me/avatar';
   static const profilesMe = '/profiles/me';
 
   static const discoveryFeed = '/discovery/feed';

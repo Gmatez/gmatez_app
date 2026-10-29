@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
 
 import '../../app/theme/app_colors.dart';
 
@@ -8,12 +9,14 @@ class UserAvatar extends StatelessWidget {
     super.key,
     required this.name,
     this.imageUrl,
+    this.imageBytes,
     this.size = 48,
     this.online,
   });
 
   final String name;
   final String? imageUrl;
+  final Uint8List? imageBytes;
   final double size;
   final bool? online;
 
@@ -25,10 +28,12 @@ class UserAvatar extends StatelessWidget {
       radius: size / 2,
       backgroundColor: AppColors.surfaceMuted,
       foregroundColor: AppColors.primary,
-      backgroundImage: image != null && image.isNotEmpty
+      backgroundImage: imageBytes != null
+          ? MemoryImage(imageBytes!)
+          : image != null && image.isNotEmpty
           ? CachedNetworkImageProvider(image)
           : null,
-      child: image == null || image.isEmpty
+      child: (imageBytes == null && (image == null || image.isEmpty))
           ? Text(
               initials,
               style: TextStyle(

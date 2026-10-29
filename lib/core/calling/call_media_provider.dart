@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/widgets.dart';
@@ -271,9 +270,11 @@ class AgoraCallMediaProvider implements CallMediaProvider {
       await engine.setDefaultAudioRouteToSpeakerphone(true);
       if (video) {
         await engine.enableVideo();
+        await engine.enableLocalVideo(true);
         _localView = VideoViewController(
           rtcEngine: engine,
-          useAndroidSurfaceView: Platform.isAndroid,
+          useAndroidSurfaceView: false,
+          useFlutterTexture: false,
           canvas: const VideoCanvas(
             uid: 0,
             renderMode: RenderModeType.renderModeHidden,
@@ -344,7 +345,8 @@ class AgoraCallMediaProvider implements CallMediaProvider {
     _remoteViewUid = remoteUid;
     _remoteView = VideoViewController.remote(
       rtcEngine: engine,
-      useAndroidSurfaceView: Platform.isAndroid,
+      useAndroidSurfaceView: false,
+      useFlutterTexture: false,
       canvas: VideoCanvas(
         uid: remoteUid,
         renderMode: RenderModeType.renderModeHidden,

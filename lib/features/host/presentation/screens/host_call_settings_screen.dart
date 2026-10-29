@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_layout.dart';
 import '../../../../app/theme/app_tokens.dart';
 import '../../../../core/constants/api_paths.dart';
+import '../../../../core/constants/speaking_languages.dart';
 import '../../../../core/di/core_providers.dart';
 import '../../../../core/utils/money.dart';
 import '../../../../core/utils/result.dart';
@@ -20,11 +21,11 @@ class HostCallSettingsScreen extends ConsumerStatefulWidget {
 
 class _HostCallSettingsScreenState
     extends ConsumerState<HostCallSettingsScreen> {
-  final _languages = TextEditingController();
   final _interests = TextEditingController();
   final _bio = TextEditingController();
   final _voiceRate = TextEditingController();
   final _videoRate = TextEditingController();
+  final Set<String> _speaking = {'en'};
   bool _voice = true;
   bool _video = true;
   bool _loading = true;
@@ -39,7 +40,6 @@ class _HostCallSettingsScreenState
 
   @override
   void dispose() {
-    _languages.dispose();
     _interests.dispose();
     _bio.dispose();
     _voiceRate.dispose();
@@ -69,9 +69,17 @@ class _HostCallSettingsScreenState
           _video = host['videoEnabled'] as bool? ?? true;
           _voiceRate.text = '${asInt(host['voiceRatePerMinuteCents'], 100)}';
           _videoRate.text = '${asInt(host['videoRatePerMinuteCents'], 150)}';
-          _languages.text = ((host['languages'] as List?) ?? const [])
-              .whereType<String>()
-              .join(', ');
+          _speaking
+            ..clear()
+            ..addAll(
+              ((host['languages'] as List?) ?? const [])
+                  .whereType<String>()
+                  .map((value) => value.toLowerCase())
+                  .where(speakingLanguages.containsKey),
+            );
+          if (_speaking.isEmpty) {
+            _speaking.add('en');
+          }
           _interests.text = ((host['interests'] as List?) ?? const [])
               .whereType<String>()
               .join(', ');
@@ -101,7 +109,7 @@ class _HostCallSettingsScreenState
                 int.tryParse(_voiceRate.text.trim()) ?? 100,
             'videoRatePerMinuteCents':
                 int.tryParse(_videoRate.text.trim()) ?? 150,
-            'languages': _csv(_languages.text),
+            'languages': _speaking.toList(),
             'interests': _csv(_interests.text),
             'applicationBio': _bio.text.trim(),
           },
@@ -117,6 +125,11 @@ class _HostCallSettingsScreenState
       ).showSnackBar(SnackBar(content: Text(failure.userMessage)));
       return;
     }
+    await ref.read(apiClientProvider).patch(
+      ApiPaths.profilesMe,
+      body: {'language': _speaking.first},
+      parser: (_) {},
+    );
     await ref.read(authNotifierProvider.notifier).refreshUser();
     if (mounted) {
       ScaffoldMessenger.of(
@@ -173,13 +186,13 @@ class _HostCallSettingsScreenState
                   children: [
                     AppTextField(
                       controller: _voiceRate,
-                      label: 'Voice rate (cents/min)',
+                      label: 'Voice price per minute',
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     AppTextField(
                       controller: _videoRate,
-                      label: 'Video rate (cents/min)',
+                      label: 'Video price per minute',
                       keyboardType: TextInputType.number,
                     ),
                   ],
@@ -191,9 +204,33 @@ class _HostCallSettingsScreenState
               AppCard(
                 child: Column(
                   children: [
-                    AppTextField(
-                      controller: _languages,
-                      label: 'Languages (comma separated)',
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Speaking languages',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final entry in speakingLanguages.entries)
+                          FilterChip(
+                            label: Text(entry.value),
+                            selected: _speaking.contains(entry.key),
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  _speaking.add(entry.key);
+                                } else if (_speaking.length > 1) {
+                                  _speaking.remove(entry.key);
+                                }
+                              });
+                            },
+                          ),
+                      ],
                     ),
                     const SizedBox(height: AppSpacing.md),
                     AppTextField(

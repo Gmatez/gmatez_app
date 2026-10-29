@@ -27,6 +27,14 @@ class AuthRemoteDataSource {
     );
   }
 
+  Future<Result<SessionDto>> verifyFirebasePhoneToken(String idToken) {
+    return _client.post(
+      ApiPaths.authPhoneFirebaseVerify,
+      body: {'idToken': idToken},
+      parser: (data) => SessionDto.fromJson(data as Map<String, dynamic>),
+    );
+  }
+
   Future<Result<OtpChallengeDto>> requestOtp(String email) {
     return _client.post(
       ApiPaths.authOtpRequest,

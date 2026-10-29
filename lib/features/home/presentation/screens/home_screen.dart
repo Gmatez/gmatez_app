@@ -4,11 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/router/app_routes.dart';
+import '../../../../l10n/app_strings.dart';
 import '../../../../app/shell/app_shell.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_layout.dart';
 import '../../../../app/theme/app_tokens.dart';
 import '../../../../core/constants/api_paths.dart';
+import '../../../../core/constants/speaking_languages.dart';
 import '../../../../core/di/core_providers.dart';
 import '../../../../core/motion/app_motion.dart';
 import '../../../../core/utils/money.dart';
@@ -39,6 +41,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   List<UserProfile> _hosts = const [];
   List<PromoBanner> _banners = const [];
   bool _loading = true;
+  bool _onlineOnly = true;
+  String? _language;
   String? _error;
 
   @override
@@ -52,36 +56,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _loading = true;
       _error = null;
     });
-    final wallet = await ref.read(apiClientProvider).get(
-      ApiPaths.wallet,
-      parser: (data) => WalletSnapshot.fromJson(asMap(data)),
-    );
-    final history = await ref.read(callRepositoryProvider).history();
-    final feed = await ref
-        .read(discoveryRepositoryProvider)
-        .feed(const DiscoveryQuery(limit: 10, onlineOnly: true));
-    final banners = await ref.read(apiClientProvider).get(
-      ApiPaths.banners,
-      parser: (data) => asMapList(data)
-          .map(PromoBanner.fromJson)
-          .where((b) => b.id.isNotEmpty && b.title.isNotEmpty)
-          .toList(),
-    );
+    final results = await Future.wait([
+      ref.read(apiClientProvider).get(
+        ApiPaths.wallet,
+        parser: (data) => WalletSnapshot.fromJson(asMap(data)),
+      ),
+      ref.read(callRepositoryProvider).history(),
+      ref.read(discoveryRepositoryProvider).feed(
+        DiscoveryQuery(
+          limit: 12,
+          onlineOnly: _onlineOnly,
+          language: _language,
+        ),
+      ),
+      ref.read(apiClientProvider).get(
+        ApiPaths.banners,
+        parser: (data) => asMapList(data)
+            .map(PromoBanner.fromJson)
+            .where((b) => b.id.isNotEmpty && b.title.isNotEmpty)
+            .toList(),
+      ),
+    ]);
     if (!mounted) {
       return;
     }
     setState(() {
       _loading = false;
+      final wallet = results[0] as Result<WalletSnapshot>;
+      final history = results[1] as Result<dynamic>;
+      final feed = results[2] as Result<dynamic>;
+      final banners = results[3] as Result<List<PromoBanner>>;
       if (wallet case Success(:final value)) {
         _wallet = value;
       } else if (wallet case Failure(:final failure)) {
         _error ??= failure.userMessage;
       }
       if (history case Success(:final value)) {
-        _calls = value.items.take(4).toList();
+        final items = (value as dynamic).items as List;
+        _calls = items.whereType<CallSession>().take(4).toList();
       }
       if (feed case Success(:final value)) {
-        _hosts = value.items;
+        final items = (value as dynamic).items as List;
+        _hosts = items.whereType<UserProfile>().toList();
       }
       if (banners case Success(:final value)) {
         _banners = value;
@@ -115,7 +131,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   children: [
                     const Expanded(child: GmatezBrandMark(compact: true)),
                     IconButton(
-                      tooltip: 'Wallet',
+                      tooltip: AppStrings.of(context)('wallet'),
                       onPressed: () => context.go(AppRoutes.wallet),
                       style: IconButton.styleFrom(
                         backgroundColor: AppColors.surfaceElevated,
@@ -125,7 +141,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      tooltip: 'Notifications',
+                      tooltip: AppStrings.of(context)('notifications'),
                       onPressed: () => context.push(AppRoutes.notifications),
                       style: IconButton.styleFrom(
                         backgroundColor: AppColors.surfaceElevated,
@@ -326,7 +342,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 FadeInUp(
                   delay: const Duration(milliseconds: 150),
                   child: SectionLabel(
-                    'Online now',
+                    _onlineOnly ? 'Online now' : 'Listeners',
                     trailing: TextButton(
                       onPressed: () => context.go(AppRoutes.discover),
                       child: const Text('Browse'),
@@ -334,6 +350,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      FilterChip(
+                        label: const Text('Online'),
+                        selected: _onlineOnly,
+                        onSelected: (selected) {
+                          setState(() => _onlineOnly = selected);
+                          _load();
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        label: const Text('All languages'),
+                        selected: _language == null,
+                        onSelected: (_) {
+                          setState(() => _language = null);
+                          _load();
+                        },
+                      ),
+                      for (final entry in speakingLanguages.entries) ...[
+                        const SizedBox(width: 8),
+                        FilterChip(
+                          label: Text(entry.value),
+                          selected: _language == entry.key,
+                          onSelected: (_) {
+                            setState(() => _language = entry.key);
+                            _load();
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 if (_hosts.isEmpty)
                   EnterpriseEmptyState(
                     icon: Icons.people_outline_rounded,
@@ -475,26 +527,100 @@ class _OnlineHostTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rate = displayRateCents(host.ratePerMinuteCents, userRateCents);
-    final rateLabel = rate > 0
-        ? '${(rate / 10).round()} cr/min'
-        : 'View rates';
+    final rateLabel = rate > 0 ? '${(rate / 10).round()} cr/min' : 'Ask for rates';
+    final languages = host.languages
+        .map((code) => speakingLanguages[code] ?? code)
+        .take(3)
+        .join(' · ');
+    return Material(
+      color: AppColors.surfaceElevated,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => context.push(AppRoutes.profileFor(host.userId)),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              UserAvatar(
+                name: host.displayName,
+                imageUrl: host.avatarUrl,
+                online: host.online,
+                size: 58,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      host.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      host.bio.isEmpty ? 'Ready for a conversation' : host.bio,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: AppColors.textSecondary, height: 1.3),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _MiniTag(
+                          icon: host.online ? Icons.circle : Icons.circle_outlined,
+                          label: host.online ? 'Online' : 'Away',
+                        ),
+                        if (languages.isNotEmpty)
+                          _MiniTag(icon: Icons.translate_rounded, label: languages),
+                        _MiniTag(icon: Icons.payments_outlined, label: rateLabel),
+                        if (host.voiceEnabled)
+                          const _MiniTag(icon: Icons.call_rounded, label: 'Voice'),
+                        if (host.videoEnabled)
+                          const _MiniTag(icon: Icons.videocam_rounded, label: 'Video'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-    return EnterpriseListTile(
-      leading: UserAvatar(
-        name: host.displayName,
-        imageUrl: host.avatarUrl,
-        online: true,
-        size: 44,
+class _MiniTag extends StatelessWidget {
+  const _MiniTag({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(99),
       ),
-      title: host.displayName,
-      subtitle: host.bio.isEmpty
-          ? 'Available for calls · $rateLabel'
-          : '${host.bio} · $rateLabel',
-      trailing: const StatusBadge(
-        label: 'Online',
-        tone: StatusBadgeTone.success,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: AppColors.primary),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+        ],
       ),
-      onTap: () => context.push(AppRoutes.profileFor(host.userId)),
     );
   }
 }

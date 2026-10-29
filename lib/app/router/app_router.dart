@@ -84,6 +84,27 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (auth.user?.isActiveHost == true && location == AppRoutes.discover) {
         return AppRoutes.home;
       }
+      if (auth.isAuthenticated) {
+        final activeHost = auth.user?.isActiveHost == true;
+        final hostOnly =
+            location == AppRoutes.hostDashboard ||
+            location == AppRoutes.hostCallSettings ||
+            location == AppRoutes.earnings ||
+            location == AppRoutes.payouts;
+        if (hostOnly && !activeHost) {
+          return AppRoutes.home;
+        }
+        final callerOnly =
+            location == AppRoutes.hostApply ||
+            location == AppRoutes.hostOnboarding;
+        if (callerOnly && activeHost) {
+          return AppRoutes.home;
+        }
+        if (location == AppRoutes.hostPending &&
+            (activeHost || auth.user?.host == null)) {
+          return AppRoutes.home;
+        }
+      }
       return null;
     },
     routes: [
@@ -112,8 +133,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   if (user?.isActiveHost == true) {
                     return const HostDashboardScreen();
                   }
-                  if (user?.isPendingHost == true ||
-                      user?.isRejectedHost == true ||
+                  if (user?.isRejectedHost == true ||
                       user?.isSuspendedHost == true) {
                     return const HostPendingScreen();
                   }
@@ -144,7 +164,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: AppRoutes.wallet,
-                builder: (_, _) => const WalletScreen(),
+                builder: (_, _) {
+                  final user = ref.read(authNotifierProvider).user;
+                  if (user?.isActiveHost == true) {
+                    return const EarningsScreen();
+                  }
+                  return const WalletScreen();
+                },
               ),
             ],
           ),

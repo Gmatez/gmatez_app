@@ -5,21 +5,17 @@ import 'package:gmatez_app/app/config/app_config.dart';
 import 'package:gmatez_app/app/config/app_environment.dart';
 import 'package:gmatez_app/core/di/core_providers.dart';
 import 'package:gmatez_app/core/logging/app_logger.dart';
-import 'package:gmatez_app/core/utils/result.dart';
-import 'package:gmatez_app/features/auth/domain/entities/session.dart';
 import 'package:gmatez_app/features/auth/presentation/screens/otp_screen.dart';
 import 'package:gmatez_app/features/auth/presentation/state/auth_notifier.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../fakes/fake_auth_repository.dart';
+import '../../fakes/fake_firebase_phone_auth_service.dart';
 
 void main() {
   testWidgets('OTP screen shows resend cooldown after request', (tester) async {
-    final fake = FakeAuthRepository(
-      requestOtpResult: const Success(
-        OtpChallenge(expiresInSeconds: 300, resendAvailableInSeconds: 60),
-      ),
-    );
+    final fake = FakeAuthRepository();
+    final fakeFirebaseAuth = FakeFirebasePhoneAuthService();
 
     await tester.pumpWidget(
       ProviderScope(
@@ -36,6 +32,7 @@ void main() {
           ),
           appLoggerProvider.overrideWithValue(AppLogger(enabled: false)),
           authRepositoryProvider.overrideWithValue(fake),
+          firebasePhoneAuthServiceProvider.overrideWithValue(fakeFirebaseAuth),
         ],
         child: MaterialApp.router(
           routerConfig: GoRouter(
@@ -54,9 +51,10 @@ void main() {
     );
     await container
         .read(authNotifierProvider.notifier)
-        .requestPhoneOtp('+919876543210');
+        .startPhoneVerification('+919876543210');
     await tester.pump();
 
+    expect(fakeFirebaseAuth.startVerificationCalls, 1);
     expect(find.textContaining('Resend in'), findsOneWidget);
     expect(find.textContaining('Verify'), findsOneWidget);
   });

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../../app/router/app_routes.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/user_avatar.dart';
+import '../screens/call_screen.dart';
 import '../state/active_call_notifier.dart';
 
 class IncomingCallHost extends ConsumerStatefulWidget {
@@ -18,57 +17,60 @@ class IncomingCallHost extends ConsumerStatefulWidget {
 }
 
 class _IncomingCallHostState extends ConsumerState<IncomingCallHost> {
-  String? _openedCallId;
-
-  void _openCallScreen(String callId) {
-    if (_openedCallId == callId || callId.isEmpty) {
-      return;
-    }
-    final router = GoRouter.maybeOf(context);
-    if (router == null) {
-      return;
-    }
-    final path = router.state.uri.path;
-    if (path == AppRoutes.callFor(callId) || path.startsWith('/call/$callId')) {
-      _openedCallId = callId;
-      return;
-    }
-    _openedCallId = callId;
-    router.push(AppRoutes.callFor(callId));
-  }
-
   @override
   Widget build(BuildContext context) {
-    ref.listen(activeCallProvider, (previous, next) {
-      final active = next.active;
-      if (active == null ||
-          active.status.isTerminal ||
-          next.callScreenHidden) {
-        _openedCallId = null;
-        return;
-      }
-      final callId = active.id;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) {
-          return;
-        }
-        final current = ref.read(activeCallProvider);
-        final open = current.active;
-        if (open == null ||
-            open.id != callId ||
-            open.status.isTerminal ||
-            current.callScreenHidden) {
-          return;
-        }
-        _openCallScreen(callId);
-      });
-    });
-
-    final incoming = ref.watch(activeCallProvider).incoming;
+    final callState = ref.watch(activeCallProvider);
+    final incoming = callState.incoming;
+    final active = callState.active;
+    final showCall =
+        active != null &&
+        !active.status.isTerminal &&
+        !callState.callScreenHidden;
     return Stack(
       children: [
         widget.child,
-        if (incoming != null)
+        if (active != null && showCall)
+          Positioned.fill(
+            child: CallScreen(callId: active.id, embedded: true),
+          ),
+        if (active != null &&
+            !active.status.isTerminal &&
+            callState.callScreenHidden)
+              Positioned(
+                left: 12,
+                right: 12,
+                top: MediaQuery.paddingOf(context).top + 8,
+                child: Material(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => ref
+                        .read(activeCallProvider.notifier)
+                        .showCallScreen(),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      child: Row(
+                        children: [
+                          Icon(Icons.call_rounded, color: Colors.white),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Call in progress · tap to open',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          Icon(Icons.open_in_full_rounded, color: Colors.white),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (incoming != null)
           Positioned.fill(
             child: Material(
               color: AppColors.backgroundDeep.withValues(alpha: 0.96),
@@ -166,7 +168,7 @@ class _IncomingCallHostState extends ConsumerState<IncomingCallHost> {
               ),
             ),
           ),
-      ],
+        ],
     );
   }
 }

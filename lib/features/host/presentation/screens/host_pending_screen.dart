@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_routes.dart';
+import '../../../../l10n/app_strings.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_layout.dart';
 import '../../../../app/theme/app_tokens.dart';
@@ -111,25 +112,25 @@ class HostPendingScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.xl),
           AppButton(
-            label: 'Back to Profile',
+            label: AppStrings.of(context)('backToProfile'),
             onPressed: () => context.go(AppRoutes.myProfile),
           ),
           const SizedBox(height: AppSpacing.sm),
           AppButton(
-            label: 'Continue as caller',
+            label: AppStrings.of(context)('continueAsCaller'),
             variant: AppButtonVariant.ghost,
             onPressed: () => context.go(AppRoutes.discover),
           ),
           if (rejected) ...[
             const SizedBox(height: AppSpacing.sm),
             AppButton(
-              label: 'Apply again',
+              label: AppStrings.of(context)('applyAgain'),
               onPressed: () => context.push(AppRoutes.hostApply),
             ),
           ],
           const SizedBox(height: AppSpacing.sm),
           AppButton(
-            label: 'Refresh status',
+            label: AppStrings.of(context)('refreshStatus'),
             variant: AppButtonVariant.secondary,
             onPressed: () async {
               await ref.read(authNotifierProvider.notifier).refreshUser();

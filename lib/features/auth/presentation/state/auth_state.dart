@@ -18,6 +18,8 @@ class AuthState extends Equatable {
     this.failure,
     this.pendingEmail,
     this.pendingPhone,
+    this.pendingVerificationId,
+    this.pendingResendToken,
     this.debugOtp,
     this.otpExpiresInSeconds,
     this.otpResendAvailableInSeconds,
@@ -54,6 +56,8 @@ class AuthState extends Equatable {
   final AppFailure? failure;
   final String? pendingEmail;
   final String? pendingPhone;
+  final String? pendingVerificationId;
+  final int? pendingResendToken;
   final String? debugOtp;
   final int? otpExpiresInSeconds;
   final int? otpResendAvailableInSeconds;
@@ -70,6 +74,8 @@ class AuthState extends Equatable {
     AppFailure? failure,
     String? pendingEmail,
     String? pendingPhone,
+    String? pendingVerificationId,
+    int? pendingResendToken,
     String? debugOtp,
     int? otpExpiresInSeconds,
     int? otpResendAvailableInSeconds,
@@ -82,6 +88,9 @@ class AuthState extends Equatable {
       failure: clearFailure ? null : failure ?? this.failure,
       pendingEmail: pendingEmail ?? this.pendingEmail,
       pendingPhone: pendingPhone ?? this.pendingPhone,
+      pendingVerificationId:
+          pendingVerificationId ?? this.pendingVerificationId,
+      pendingResendToken: pendingResendToken ?? this.pendingResendToken,
       debugOtp: clearDebugOtp ? null : debugOtp ?? this.debugOtp,
       otpExpiresInSeconds: otpExpiresInSeconds ?? this.otpExpiresInSeconds,
       otpResendAvailableInSeconds:
@@ -96,6 +105,7 @@ class AuthState extends Equatable {
     failure,
     pendingEmail,
     pendingPhone,
+    pendingVerificationId,
     otpExpiresInSeconds,
     otpResendAvailableInSeconds,
   ];

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_routes.dart';
+import '../../../../l10n/app_strings.dart';
 import '../../../../app/theme/app_layout.dart';
 import '../../../../app/theme/app_tokens.dart';
 import '../../../../core/constants/api_paths.dart';
@@ -75,26 +76,26 @@ class PublicProfileScreen extends ConsumerWidget {
                     StaggeredList(
                       children: [
                         AppButton(
-                          label: 'Voice call',
+                          label: AppStrings.of(context)('voiceCall'),
                           icon: Icons.call_rounded,
                           onPressed: value.availableForCall && value.voiceEnabled
                               ? () => _startCall(context, ref, 'VOICE')
                               : () => _unavailable(context),
                         ),
                         AppButton(
-                          label: 'Video call',
+                          label: AppStrings.of(context)('videoCall'),
                           icon: Icons.videocam_rounded,
                           onPressed: value.availableForCall && value.videoEnabled
                               ? () => _startCall(context, ref, 'VIDEO')
                               : () => _unavailable(context),
                         ),
                         AppButton(
-                          label: 'Block',
+                          label: AppStrings.of(context)('block'),
                           variant: AppButtonVariant.ghost,
                           onPressed: () => _block(context, ref),
                         ),
                         AppButton(
-                          label: 'Report',
+                          label: AppStrings.of(context)('report'),
                           variant: AppButtonVariant.danger,
                           onPressed: () => _report(context, ref),
                         ),

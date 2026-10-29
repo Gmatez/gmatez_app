@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/router/app_routes.dart';
+import '../../../../l10n/app_strings.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_layout.dart';
 import '../../../../core/di/core_providers.dart';
@@ -94,7 +95,7 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ScreenHeader(
-                title: 'Messages',
+                title: AppStrings.of(context)('messages'),
                 subtitle: 'Secure conversations with listeners',
                 action: IconButton(
                   tooltip: 'Find people',

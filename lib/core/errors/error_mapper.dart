@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../errors/app_failure.dart';
 import '../network/api_error_dto.dart';
@@ -44,7 +45,8 @@ abstract final class ErrorMapper {
     'HOST_CALL_TYPE_DISABLED': 'This call type is not available for this host.',
     'HOST_APPLICATION_EXISTS': 'A host application is already in progress.',
     'HOST_APPLICATION_INVALID': 'Please complete the host application details.',
-    'HOST_INCOMPLETE': 'Complete your host profile before going online.',
+    'HOST_INCOMPLETE':
+        'Complete the missing host profile details before going online.',
     'HOST_VERIFICATION_REQUIRED': 'Host verification is still required.',
     'HOST_AGREEMENT_REQUIRED': 'Please accept the required host agreements.',
     'HOST_SUSPENDED': 'This host account is suspended.',
@@ -61,6 +63,43 @@ abstract final class ErrorMapper {
     'PAYOUT_NOT_ELIGIBLE': 'This payout cannot be requested right now.',
     'INTERNAL': 'Something went wrong. Please try again.',
   };
+
+  static AppFailure fromFirebaseAuth(FirebaseAuthException error) {
+    return switch (error.code) {
+      'invalid-verification-code' ||
+      'invalid-verification-id' => const AppFailure(
+        kind: FailureKind.otpInvalid,
+        message: 'That code is incorrect. Please try again.',
+        code: 'OTP_INVALID',
+      ),
+      'session-expired' || 'code-expired' => const AppFailure(
+        kind: FailureKind.otpExpired,
+        message: 'That code expired. Request a new one.',
+        code: 'OTP_EXPIRED',
+      ),
+      'too-many-requests' || 'quota-exceeded' => const AppFailure(
+        kind: FailureKind.otpRateLimited,
+        message: 'Too many attempts. Please wait and try again.',
+        code: 'OTP_RATE_LIMITED',
+      ),
+      'network-request-failed' => const AppFailure(
+        kind: FailureKind.offline,
+        message:
+            'Cannot reach the verification service. Please check your connection.',
+        code: 'OFFLINE',
+      ),
+      'invalid-phone-number' => const AppFailure(
+        kind: FailureKind.validation,
+        message: 'Enter a valid phone number.',
+        code: 'VALIDATION_FAILED',
+      ),
+      _ => AppFailure(
+        kind: FailureKind.unknown,
+        message: error.message ?? 'Something went wrong. Please try again.',
+        code: error.code,
+      ),
+    };
+  }
 
   static AppFailure fromDio(DioException error) {
     if (error.type == DioExceptionType.connectionError ||
@@ -105,11 +144,16 @@ abstract final class ErrorMapper {
   }) {
     final resolvedCode = code ?? _codeFromStatus(statusCode);
     final retryAfter = _retryAfter(details);
+    final missing = details?['missingFields'];
+    final missingText = missing is List
+        ? missing.whereType<String>().join(', ')
+        : '';
+    final base =
+        _userMessages[resolvedCode] ??
+        'Something went wrong. Please try again.';
     return AppFailure(
       kind: _kindFor(resolvedCode, statusCode),
-      message:
-          _userMessages[resolvedCode] ??
-          'Something went wrong. Please try again.',
+      message: missingText.isEmpty ? base : '$base Missing: $missingText.',
       code: resolvedCode,
       requestId: requestId,
       statusCode: statusCode,

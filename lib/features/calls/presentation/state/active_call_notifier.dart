@@ -7,13 +7,13 @@ import '../../../../core/calling/call_media_provider.dart';
 import '../../../../core/calling/call_permissions.dart';
 import '../../../../core/calling/call_state_machine.dart';
 import '../../../../core/calling/call_status.dart';
-import '../../../../core/errors/app_failure.dart';
 import '../../../../core/di/core_providers.dart';
+import '../../../../core/errors/app_failure.dart';
 import '../../../../core/realtime/realtime_service.dart';
 import '../../../../core/utils/result.dart';
 import '../../../auth/presentation/state/auth_notifier.dart';
 import '../../data/repositories/call_repository_impl.dart';
-import '../../domain/entities/call_session.dart';w
+import '../../domain/entities/call_session.dart';
 import '../../domain/repositories/call_repository.dart';
 
 final callRepositoryProvider = Provider<CallRepository>((ref) {
@@ -92,6 +92,7 @@ class ActiveCallState {
 class ActiveCallNotifier extends Notifier<ActiveCallState> {
   StreamSubscription<RealtimeEvent>? _sub;
   StreamSubscription<CallMediaConnectionState>? _mediaSub;
+  StreamSubscription<String>? _pushSub;
   Timer? _heartbeat;
   Timer? _tokenRenewal;
   bool _joiningMedia = false;
@@ -107,6 +108,13 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
   @override
   ActiveCallState build() {
     _sub = _realtime.events.listen(_onEvent);
+    _pushSub = ref.read(incomingPushBusProvider).calls.listen((callId) {
+      unawaited(openIncomingFromPush(callId));
+    });
+    final pending = ref.read(incomingPushBusProvider).pendingCallId;
+    if (pending != null) {
+      unawaited(openIncomingFromPush(pending));
+    }
     _mediaSub = _media.connectionStates.listen((s) {
       state = state.copyWith(mediaState: s);
       if (s == CallMediaConnectionState.failed && state.active != null) {
@@ -116,10 +124,41 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
     ref.onDispose(() {
       _sub?.cancel();
       _mediaSub?.cancel();
+      _pushSub?.cancel();
       _heartbeat?.cancel();
       _tokenRenewal?.cancel();
     });
     return const ActiveCallState();
+  }
+
+  /// Open a ringing call that arrived by push while the app was backgrounded.
+  Future<void> openIncomingFromPush(String callId) async {
+    if (callId.isEmpty) {
+      return;
+    }
+    if (state.incoming?.id == callId || state.active?.id == callId) {
+      ref.read(incomingPushBusProvider).clear(callId);
+      return;
+    }
+    final result = await _calls.getById(callId);
+    if (result case Success(:final value)) {
+      final me = _myId;
+      if (me == null || (value.callerId != me && value.calleeId != me)) {
+        return;
+      }
+      if (value.status.isTerminal) {
+        ref.read(incomingPushBusProvider).clear(callId);
+        return;
+      }
+      if (value.calleeId == me &&
+          (value.status == CallStatus.ringing ||
+              value.status == CallStatus.initiated)) {
+        state = state.copyWith(incoming: value);
+      } else {
+        state = state.copyWith(active: value, callScreenHidden: false);
+      }
+      ref.read(incomingPushBusProvider).clear(callId);
+    }
   }
 
   /// Restore non-terminal call after app resume / process restart.

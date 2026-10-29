@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../core/di/core_providers.dart';
+import '../../core/firebase/firebase_phone_auth_service.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/network/api_client.dart';
+import '../../core/push/push_notifications.dart';
 import '../../core/realtime/socket_io_realtime_service.dart';
 import '../../core/storage/secure_store.dart';
 import '../../features/auth/data/datasources/auth_remote_data_source.dart';
@@ -44,6 +46,13 @@ Future<Widget> bootstrap() async {
     tokenStore: tokenStore,
   );
   final realtime = SocketIoRealtimeService(config: config, logger: logger);
+  final incomingPushBus = IncomingPushBus();
+  final push = PushNotificationService(
+    api: apiClient,
+    bus: incomingPushBus,
+    logger: logger,
+  );
+  final firebasePhoneAuth = FirebasePhoneAuthService();
 
   return ProviderScope(
     overrides: [
@@ -52,6 +61,9 @@ Future<Widget> bootstrap() async {
       tokenStoreProvider.overrideWithValue(tokenStore),
       apiClientProvider.overrideWithValue(apiClient),
       realtimeServiceProvider.overrideWithValue(realtime),
+      incomingPushBusProvider.overrideWithValue(incomingPushBus),
+      pushNotificationServiceProvider.overrideWithValue(push),
+      firebasePhoneAuthServiceProvider.overrideWithValue(firebasePhoneAuth),
       authRepositoryProvider.overrideWithValue(authRepository),
       sessionExpiredBusProvider.overrideWithValue(sessionBus),
       accountSuspendedBusProvider.overrideWithValue(suspendedBus),
@@ -76,6 +88,21 @@ class _SessionLifecycleState extends ConsumerState<SessionLifecycle>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(
+        ref.read(pushNotificationServiceProvider).start().catchError((
+          Object error,
+          StackTrace stack,
+        ) {
+          ref
+              .read(appLoggerProvider)
+              .error(
+                'Push setup failed',
+                feature: 'push',
+                error: error,
+                stackTrace: stack,
+              );
+        }),
+      );
       ref.read(sessionExpiredBusProvider).handler = () {
         ref.read(authNotifierProvider.notifier).markSessionExpired();
       };
@@ -116,7 +143,15 @@ class _SessionLifecycleState extends ConsumerState<SessionLifecycle>
         if (token != null && token.isNotEmpty) {
           await realtime.connect(token);
         }
+        await ref.read(pushNotificationServiceProvider).registerCurrentUser();
+        final pending = ref.read(incomingPushBusProvider).pendingCallId;
+        if (pending != null) {
+          await ref
+              .read(activeCallProvider.notifier)
+              .openIncomingFromPush(pending);
+        }
       } else if (previous?.isAuthenticated ?? false) {
+        await ref.read(pushNotificationServiceProvider).unregister();
         await realtime.disconnect();
       }
     });

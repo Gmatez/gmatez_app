@@ -14,7 +14,7 @@ enum AppEnvironment {
   bool get isLocal =>
       this == AppEnvironment.development || this == AppEnvironment.test;
 
-  bool get allowsMockProviders => isLocal;
+  bool get allowsMockProviders => this == AppEnvironment.test;
 }
 
 /// How call media (RTC) is provided on this build.

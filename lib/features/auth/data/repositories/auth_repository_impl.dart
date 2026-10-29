@@ -33,6 +33,11 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Result<Session>> verifyFirebasePhoneToken(String idToken) {
+    return _persistSession(_remote.verifyFirebasePhoneToken(idToken));
+  }
+
+  @override
   Future<Result<OtpChallenge>> requestOtp(String email) async {
     final result = await _remote.requestOtp(email);
     return result.fold(

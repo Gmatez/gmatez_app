@@ -9,6 +9,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_routes.dart';
 
 import '../../../../app/theme/app_colors.dart';
+
+import '../../../../app/locale/locale_controller.dart';
+import '../../../../l10n/app_strings.dart';
 import '../../../../app/theme/app_layout.dart';
 
 import '../../../../app/theme/app_tokens.dart';
@@ -139,13 +142,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             children: [
 
-              const ScreenHeader(
+              ScreenHeader(
 
-                title: 'Settings',
+                title: AppStrings.of(context)('settings'),
 
-                subtitle: 'Account, host tools, and safety',
+                subtitle: AppStrings.of(context)('language'),
 
               ),
+
+              const SizedBox(height: 12),
+
+              _LanguagePicker(),
 
               FadeInUp(
 
@@ -157,7 +164,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                       icon: Icons.person_outline_rounded,
 
-                      title: 'Edit profile',
+                      title: AppStrings.of(context)('editProfile'),
 
                       onTap: () => context.push(AppRoutes.editProfile),
 
@@ -181,7 +188,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                         icon: Icons.tune_rounded,
 
-                        title: 'Call settings',
+                        title: AppStrings.of(context)('callSettings'),
 
                         onTap: () => context.push(AppRoutes.hostCallSettings),
 
@@ -191,7 +198,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                         icon: Icons.payments_outlined,
 
-                        title: 'Earnings',
+                        title: AppStrings.of(context)('earnings'),
 
                         onTap: () => context.push(AppRoutes.earnings),
 
@@ -201,7 +208,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                         icon: Icons.account_balance_outlined,
 
-                        title: 'Payouts',
+                        title: AppStrings.of(context)('payouts'),
 
                         onTap: () => context.push(AppRoutes.payouts),
 
@@ -327,13 +334,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                     ),
 
+                    if (user?.isActiveHost != true && user?.isPendingHost != true)
+
                     AppMenuTile(
 
                       icon: Icons.headset_mic_outlined,
 
-                      title: 'Become a host',
+                      title: AppStrings.of(context)('becomeHost'),
 
-                      subtitle: 'Apply to receive paid calls and earnings',
+                      subtitle: AppStrings.of(context)('becomeHostSubtitle'),
 
                       onTap: () => context.push(AppRoutes.hostApply),
 
@@ -427,7 +436,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                 AppButton(
 
-                  label: 'Become a host',
+                  label: AppStrings.of(context)('becomeHost'),
 
                   onPressed: () => context.push(AppRoutes.hostApply),
 
@@ -437,7 +446,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                 AppButton(
 
-                  label: 'Host application status',
+                  label: AppStrings.of(context)('hostStatus'),
 
                   variant: AppButtonVariant.secondary,
 
@@ -447,7 +456,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
               AppButton(
 
-                label: 'Log out',
+                label: AppStrings.of(context)('logOut'),
 
                 variant: AppButtonVariant.ghost,
 
@@ -548,6 +557,52 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
 
       ),
+
+    );
+
+  }
+
+}
+
+
+
+class _LanguagePicker extends ConsumerWidget {
+
+  const _LanguagePicker();
+
+
+
+  @override
+
+  Widget build(BuildContext context, WidgetRef ref) {
+
+    final selected = ref.watch(localeControllerProvider).languageCode;
+
+    return Wrap(
+
+      spacing: 8,
+
+      runSpacing: 8,
+
+      children: [
+
+        for (final entry in AppStrings.languageNames.entries)
+
+          ChoiceChip(
+
+            label: Text(entry.value),
+
+            selected: selected == entry.key,
+
+            onSelected: (_) {
+
+              ref.read(localeControllerProvider.notifier).setLanguage(entry.key);
+
+            },
+
+          ),
+
+      ],
 
     );
 

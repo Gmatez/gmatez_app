@@ -110,11 +110,11 @@ void main() {
         CallingMediaProviderKind.agora,
       );
       expect(
-        AppConfig.resolveCallingMediaProvider(
+        () => AppConfig.resolveCallingMediaProvider(
           environment: AppEnvironment.development,
           mediaName: 'mock',
         ),
-        CallingMediaProviderKind.mock,
+        throwsA(isA<StateError>()),
       );
     });
   });

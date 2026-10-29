@@ -36,6 +36,7 @@ class _HostOnboardingScreenState extends ConsumerState<HostOnboardingScreen> {
   final _bio = TextEditingController();
   final _language = TextEditingController(text: 'en');
   final _identityNumber = TextEditingController();
+  String _documentType = 'AADHAAR';
   Uint8List? _frontBytes;
   Uint8List? _backBytes;
   Uint8List? _profileBytes;
@@ -183,6 +184,7 @@ class _HostOnboardingScreenState extends ConsumerState<HostOnboardingScreen> {
         'mime': mime,
         'dataBase64': base64Encode(bytes),
         'identityCardNumber': ?identityCardNumber,
+        'idProofType': _documentType,
       },
       parser: (_) {},
     );
@@ -314,7 +316,7 @@ class _HostOnboardingScreenState extends ConsumerState<HostOnboardingScreen> {
     await ref.read(hostOnboardingProvider.notifier).clearDraft();
     await ref.read(authNotifierProvider.notifier).refreshUser();
     if (mounted) {
-      context.go(AppRoutes.hostPending);
+      context.go(AppRoutes.home);
     }
   }
 
@@ -365,6 +367,7 @@ class _HostOnboardingScreenState extends ConsumerState<HostOnboardingScreen> {
                 _LanguagesStep(draft: draft, notifier: _draft),
                 HostIdentityStep(
                   number: _identityNumber,
+                  documentType: _documentType,
                   uploading: _saving,
                   images: HostIdentityImages(
                     front: _frontBytes,
@@ -375,6 +378,8 @@ class _HostOnboardingScreenState extends ConsumerState<HostOnboardingScreen> {
                     profileMime: _profileMime,
                   ),
                   onNumberChanged: (_) => setState(() {}),
+                  onDocumentTypeChanged: (value) =>
+                      setState(() => _documentType = value),
                   onPicked: (slot, bytes, mime) {
                     setState(() {
                       switch (slot) {

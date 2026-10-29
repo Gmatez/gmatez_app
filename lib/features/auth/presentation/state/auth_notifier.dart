@@ -1,8 +1,12 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/config/app_config.dart';
 import '../../../../core/di/core_providers.dart';
 import '../../../../core/errors/app_failure.dart';
+import '../../../../core/errors/error_mapper.dart';
 import '../../../../core/logging/app_logger.dart';
 import '../../../../core/utils/result.dart';
 import '../../domain/entities/session.dart';
@@ -43,32 +47,66 @@ class AuthNotifier extends Notifier<AuthState> {
     };
   }
 
-  Future<bool> requestPhoneOtp(String phone) async {
+  /// Kicks off Firebase phone-auth verification. Firebase sends and checks
+  /// the SMS code entirely client-side; this only drives its callback-based
+  /// API and bridges it into an awaitable result so callers (screens) keep
+  /// the same `if (ok && mounted) {...}` shape the old flow had.
+  Future<bool> startPhoneVerification(String phone) async {
     state = AuthState.authenticating(pendingPhone: phone);
-    final result = await _repository.requestPhoneOtp(phone);
-    switch (result) {
-      case Success<OtpChallenge>(:final value):
-        state = AuthState(
-          status: AuthStatus.unauthenticated,
-          pendingPhone: phone,
-          otpExpiresInSeconds: value.expiresInSeconds,
-          otpResendAvailableInSeconds:
-              value.resendAvailableInSeconds ?? value.expiresInSeconds,
-        );
-        _logger.info('Phone OTP requested', feature: 'auth');
-        return true;
-      case Failure<OtpChallenge>(:final failure):
-        state = AuthState.unauthenticated(
-          failure: failure,
-          pendingPhone: phone,
-        );
-        return false;
+    final completer = Completer<bool>();
+
+    void complete(bool ok) {
+      if (!completer.isCompleted) {
+        completer.complete(ok);
+      }
     }
+
+    try {
+      await ref
+          .read(firebasePhoneAuthServiceProvider)
+          .startVerification(
+            phoneNumber: phone,
+            forceResendingToken: state.pendingResendToken,
+            onCodeSent: (verificationId, resendToken) {
+              state = AuthState(
+                status: AuthStatus.unauthenticated,
+                pendingPhone: phone,
+                pendingVerificationId: verificationId,
+                pendingResendToken: resendToken,
+              );
+              _logger.info('Phone verification code sent', feature: 'auth');
+              complete(true);
+            },
+            onAutoVerified: (credential) async {
+              complete(await _completeWithCredential(credential, phone));
+            },
+            onFailed: (error) {
+              state = AuthState.unauthenticated(
+                failure: ErrorMapper.fromFirebaseAuth(error),
+                pendingPhone: phone,
+              );
+              complete(false);
+            },
+          );
+    } on FirebaseAuthException catch (error) {
+      state = AuthState.unauthenticated(
+        failure: ErrorMapper.fromFirebaseAuth(error),
+        pendingPhone: phone,
+      );
+      complete(false);
+    }
+
+    return completer.future;
   }
 
-  Future<bool> verifyPhoneOtp(String otp) async {
+  /// Completes sign-in from a manually entered SMS code.
+  Future<bool> verifyManualCode(String smsCode) async {
     final phone = state.pendingPhone;
-    if (phone == null || phone.isEmpty) {
+    final verificationId = state.pendingVerificationId;
+    if (phone == null ||
+        phone.isEmpty ||
+        verificationId == null ||
+        verificationId.isEmpty) {
       state = const AuthState.unauthenticated(
         failure: AppFailure(
           kind: FailureKind.validation,
@@ -77,10 +115,34 @@ class AuthNotifier extends Notifier<AuthState> {
       );
       return false;
     }
+    final credential = ref
+        .read(firebasePhoneAuthServiceProvider)
+        .credentialFor(verificationId: verificationId, smsCode: smsCode.trim());
+    return _completeWithCredential(credential, phone);
+  }
+
+  /// Shared by manual-code entry and Android auto-verification: exchanges a
+  /// Firebase credential for an ID token, hands it to the backend (which
+  /// issues this app's own session), then drops the local Firebase client
+  /// session — the backend's JWT remains the sole source of truth.
+  Future<bool> _completeWithCredential(
+    PhoneAuthCredential credential,
+    String phone,
+  ) async {
     state = AuthState.authenticating(pendingPhone: phone);
-    return _completeSession(
-      await _repository.verifyPhoneOtp(phone: phone, otp: otp.trim()),
-    );
+    final service = ref.read(firebasePhoneAuthServiceProvider);
+    try {
+      final idToken = await service.signInAndGetIdToken(credential);
+      final result = await _repository.verifyFirebasePhoneToken(idToken);
+      await service.signOut();
+      return _completeSession(result);
+    } on FirebaseAuthException catch (error) {
+      state = AuthState.unauthenticated(
+        failure: ErrorMapper.fromFirebaseAuth(error),
+        pendingPhone: phone,
+      );
+      return false;
+    }
   }
 
   Future<bool> requestOtp(String email) async {

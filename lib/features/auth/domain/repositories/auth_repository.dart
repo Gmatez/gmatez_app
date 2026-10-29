@@ -8,6 +8,7 @@ abstract class AuthRepository {
     required String phone,
     required String otp,
   });
+  Future<Result<Session>> verifyFirebasePhoneToken(String idToken);
   Future<Result<Session>> verifyOtp({
     required String email,
     required String otp,

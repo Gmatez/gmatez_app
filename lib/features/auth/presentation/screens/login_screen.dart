@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../l10n/app_strings.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_tokens.dart';
 import '../../../../core/di/core_providers.dart';
@@ -36,7 +37,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final e164 = PhoneValidator.toE164(_dialCode, _phone.text);
     final ok = await ref
         .read(authNotifierProvider.notifier)
-        .requestPhoneOtp(e164);
+        .startPhoneVerification(e164);
     if (ok && mounted) {
       await showPhoneOtpSheet(context);
     }
@@ -369,21 +370,21 @@ class _PhoneContinueForm extends StatelessWidget {
                       color: AppColors.primary,
                     ),
                   )
-                : const Row(
+                : Row(
                     children: [
-                      SizedBox(width: 28),
+                      const SizedBox(width: 28),
                       Expanded(
                         child: Text(
-                          'Continue',
+                          AppStrings.of(context)('continueLabel'),
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
-                      Icon(Icons.arrow_forward_rounded),
-                      SizedBox(width: 4),
+                      const Icon(Icons.arrow_forward_rounded),
+                      const SizedBox(width: 4),
                     ],
                   ),
           ),

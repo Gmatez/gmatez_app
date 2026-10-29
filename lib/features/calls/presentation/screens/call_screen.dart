@@ -71,37 +71,64 @@ class _CallScreenState extends ConsumerState<CallScreen> {
             Positioned.fill(child: mainVideo)
           else
             const ColoredBox(color: AppColors.backgroundDeep),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: mainVideo == null
-                    ? [
-                        AppColors.backgroundDeep.withValues(alpha: 0.35),
-                        AppColors.backgroundDeep.withValues(alpha: 0.92),
-                        AppColors.backgroundDeep,
-                      ]
-                    : [
-                        AppColors.backgroundDeep.withValues(alpha: 0.45),
-                        Colors.transparent,
-                        Colors.transparent,
-                        AppColors.backgroundDeep.withValues(alpha: 0.82),
-                      ],
-                stops: mainVideo == null
-                    ? const [0, 0.55, 1]
-                    : const [0, 0.22, 0.62, 1],
+          if (mainVideo == null)
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0x59141A66),
+                    Color(0xEB141A66),
+                    AppColors.backgroundDeep,
+                  ],
+                  stops: [0, 0.55, 1],
+                ),
+              ),
+            )
+          else ...[
+            const Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              height: 160,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xCC141A66), Color(0x00141A66)],
+                  ),
+                ),
               ),
             ),
-          ),
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 220,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [Color(0xE6141A66), Color(0x00141A66)],
+                  ),
+                ),
+              ),
+            ),
+          ],
           if (pip != null)
             Positioned(
               right: 16,
               top: 72,
               width: 110,
               height: 160,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white, width: 2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: pip,
               ),
             ),

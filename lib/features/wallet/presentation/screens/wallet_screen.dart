@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../app/router/app_routes.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../l10n/app_strings.dart';
 import '../../../auth/presentation/state/auth_notifier.dart';
 import '../../../../core/constants/api_paths.dart';
 import '../../../../core/di/core_providers.dart';
@@ -159,22 +161,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   Future<String?> _finishIntent(Map<String, dynamic> value) async {
     final id = value['id'] as String?;
     final provider = value['provider'] as String? ?? '';
-    final config = ref.read(appConfigProvider);
     if (id == null) {
       return topUpMessageText(TopUpMessage.failed);
-    }
-    if (provider == 'mock' && config.allowsMockPayments) {
-      final confirmed = await _api.post(
-        ApiPaths.paymentSandboxConfirm(id),
-        parser: asMap,
-      );
-      return topUpMessageText(
-        interpretTopUp(
-          provider: provider,
-          allowMock: true,
-          serverStatus: confirmed is Success ? 'SUCCEEDED' : null,
-        ),
-      );
     }
     if (provider != 'razorpay') {
       return topUpMessageText(TopUpMessage.pendingConfirmation);
@@ -250,7 +238,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
-        title: const Text('Recharge'),
+        title: Text(AppStrings.of(context)('recharge')),
         automaticallyImplyLeading: false,
         leading: context.canPop()
             ? IconButton(
@@ -303,6 +291,33 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                         bottom: 16,
                       ),
                       children: [
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF3D4FFF), Color(0xFF6C4DFF)],
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 36),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Your balance', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
+                                    Text('$credits credits', style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800)),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.add_card_rounded, color: Colors.white),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         if ((_wallet?.heldBalanceCents ?? 0) > 0)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 12),
@@ -315,11 +330,12 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                             ),
                           ),
                         if (isListener)
-                          const EmptyState(
+                          EmptyState(
                             icon: Icons.headphones_rounded,
-                            title: 'Listener wallet',
-                            message:
-                                'Recharge is for callers. Your earnings stay in this wallet.',
+                            title: AppStrings.of(context)('listenerWallet'),
+                            message: AppStrings.of(context)('listenerWalletMessage'),
+                            actionLabel: AppStrings.of(context)('viewEarnings'),
+                            onAction: () => context.push(AppRoutes.earnings),
                           )
                         else ...[
                           const _RechargePromo(),

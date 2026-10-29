@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_routes.dart';
+import '../../../../l10n/app_strings.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_layout.dart';
 import '../../../../app/theme/app_tokens.dart';
@@ -110,9 +111,9 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
                   bottom: AppSpacing.lg,
                 ),
                 children: [
-                  const ScreenHeader(
-                    title: 'Calls',
-                    subtitle: 'Tap to redial voice or video',
+                  ScreenHeader(
+                    title: AppStrings.of(context)('calls'),
+                    subtitle: AppStrings.of(context)('callsSubtitle'),
                   ),
                   StaggeredList(
                     children: [
@@ -235,4 +236,4 @@ String _ago(DateTime? time) {
   }
   return '${delta.inDays} days ago';
 }
-
+

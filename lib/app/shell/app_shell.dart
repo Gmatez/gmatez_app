@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../features/auth/presentation/state/auth_notifier.dart';
 import '../router/app_routes.dart';
 import '../theme/app_colors.dart';
+import '../../l10n/app_strings.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, required this.navigationShell});
@@ -68,32 +69,33 @@ class _AppShellState extends ConsumerState<AppShell> {
     final visualIndex = isHost
         ? (shellIndex <= 1 ? 0 : shellIndex - 1)
         : shellIndex;
+    final text = AppStrings.of(context);
     final destinations = <NavigationDestination>[
       NavigationDestination(
         icon: Icon(isHost ? Icons.dashboard_outlined : Icons.home_outlined),
         selectedIcon: Icon(isHost ? Icons.dashboard_rounded : Icons.home_rounded),
-        label: isHost ? 'Studio' : 'Home',
+        label: isHost ? text('studio') : text('home'),
       ),
       if (!isHost)
-        const NavigationDestination(
-          icon: Icon(Icons.explore_outlined),
-          selectedIcon: Icon(Icons.explore_rounded),
-          label: 'Discover',
+        NavigationDestination(
+          icon: const Icon(Icons.explore_outlined),
+          selectedIcon: const Icon(Icons.explore_rounded),
+          label: text('discover'),
         ),
-      const NavigationDestination(
-        icon: Icon(Icons.call_outlined),
-        selectedIcon: Icon(Icons.call_rounded),
-        label: 'Calls',
+      NavigationDestination(
+        icon: const Icon(Icons.call_outlined),
+        selectedIcon: const Icon(Icons.call_rounded),
+        label: text('calls'),
       ),
-      const NavigationDestination(
-        icon: Icon(Icons.account_balance_wallet_outlined),
-        selectedIcon: Icon(Icons.account_balance_wallet_rounded),
-        label: 'Recharge',
+      NavigationDestination(
+        icon: const Icon(Icons.account_balance_wallet_outlined),
+        selectedIcon: const Icon(Icons.account_balance_wallet_rounded),
+        label: isHost ? text('earnings') : text('recharge'),
       ),
-      const NavigationDestination(
-        icon: Icon(Icons.person_outline_rounded),
-        selectedIcon: Icon(Icons.person_rounded),
-        label: 'Profile',
+      NavigationDestination(
+        icon: const Icon(Icons.person_outline_rounded),
+        selectedIcon: const Icon(Icons.person_rounded),
+        label: text('profile'),
       ),
     ];
 

@@ -6,8 +6,8 @@ import 'app_tokens.dart';
 
 abstract final class AppTheme {
   static ThemeData light() {
-    final display = GoogleFonts.plusJakartaSansTextTheme();
-    final body = GoogleFonts.plusJakartaSansTextTheme();
+    final display = GoogleFonts.poppinsTextTheme();
+    final body = GoogleFonts.poppinsTextTheme();
     final textTheme = body.copyWith(
       displayLarge: display.displayLarge?.copyWith(
         fontWeight: FontWeight.w800,
@@ -61,6 +61,13 @@ abstract final class AppTheme {
       textTheme: textTheme.apply(
         bodyColor: AppColors.textPrimary,
         displayColor: AppColors.textPrimary,
+        fontFamilyFallback: const [
+          'Noto Sans Malayalam',
+          'Noto Sans Tamil',
+          'Noto Sans Kannada',
+          'Noto Sans Devanagari',
+          'Noto Sans',
+        ],
       ),
       actionIconTheme: ActionIconThemeData(
         backButtonIconBuilder: (context) => const Icon(Icons.arrow_back_ios),
@@ -71,7 +78,7 @@ abstract final class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.plusJakartaSans(
+        titleTextStyle: GoogleFonts.poppins(
           fontSize: 20,
           fontWeight: FontWeight.w800,
           color: AppColors.textPrimary,
@@ -94,7 +101,7 @@ abstract final class AppTheme {
         indicatorColor: AppColors.primary.withValues(alpha: 0.14),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
-          return GoogleFonts.plusJakartaSans(
+          return GoogleFonts.poppins(
             fontSize: 12,
             fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
             color: selected ? AppColors.primary : AppColors.textMuted,

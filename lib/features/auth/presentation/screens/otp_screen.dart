@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../l10n/app_strings.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_tokens.dart';
 import '../../../../core/motion/app_motion.dart';
@@ -42,20 +43,21 @@ class OtpScreen extends ConsumerStatefulWidget {
   ConsumerState<OtpScreen> createState() => _OtpScreenState();
 }
 
+/// Firebase doesn't hand back a server-side resend TTL the way the old
+/// backend OTP challenge did — this is a fixed client-side cooldown instead.
+const _resendCooldownSeconds = 30;
+
 class _OtpScreenState extends ConsumerState<OtpScreen> {
   final _otp = TextEditingController();
   final _focus = FocusNode();
   String? _localError;
-  int _secondsLeft = 60;
+  int _secondsLeft = _resendCooldownSeconds;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    final auth = ref.read(authNotifierProvider);
-    final cooldown =
-        auth.otpResendAvailableInSeconds ?? auth.otpExpiresInSeconds ?? 60;
-    _secondsLeft = cooldown.clamp(1, 600);
+    _secondsLeft = _resendCooldownSeconds;
     _startTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
   }
@@ -90,7 +92,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     }
     final ok = await ref
         .read(authNotifierProvider.notifier)
-        .verifyPhoneOtp(_otp.text);
+        .verifyManualCode(_otp.text);
     if (ok && mounted && widget.asSheet) {
       Navigator.of(context).pop();
     }
@@ -103,11 +105,10 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     }
     final ok = await ref
         .read(authNotifierProvider.notifier)
-        .requestPhoneOtp(phone);
+        .startPhoneVerification(phone);
     if (ok && mounted) {
-      final auth = ref.read(authNotifierProvider);
       setState(() {
-        _secondsLeft = (auth.otpResendAvailableInSeconds ?? 60).clamp(1, 600);
+        _secondsLeft = _resendCooldownSeconds;
         _localError = null;
       });
       _startTimer();
@@ -123,6 +124,20 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Android can auto-verify (silent SMS retrieval) before the user ever
+    // types a code, completing sign-in while this sheet/screen is still
+    // showing (or just about to show). Close it the moment that happens.
+    ref.listen<AuthState>(authNotifierProvider, (previous, next) {
+      if (next.isAuthenticated && !(previous?.isAuthenticated ?? false)) {
+        if (widget.asSheet) {
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+        } else if (mounted) {
+          context.pop();
+        }
+      }
+    });
     final auth = ref.watch(authNotifierProvider);
     final busy = auth.status == AuthStatus.authenticating;
     final error = _localError ?? auth.failure?.userMessage;
@@ -160,7 +175,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Text(
-                  'Enter verification code',
+                  AppStrings.of(context)('enterCode'),
                   style: GoogleFonts.plusJakartaSans(
                     color: AppColors.textPrimary,
                     fontSize: 26,
@@ -177,7 +192,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                       height: 1.4,
                     ),
                     children: [
-                      const TextSpan(text: 'We sent a 6-digit code to '),
+                      TextSpan(text: AppStrings.of(context)('codeSentTo')),
                       TextSpan(
                         text: phone,
                         style: const TextStyle(

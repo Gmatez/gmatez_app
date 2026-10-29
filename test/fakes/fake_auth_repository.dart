@@ -51,6 +51,11 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<Result<Session>> verifyFirebasePhoneToken(String idToken) async {
+    return verifyOtpResult ?? const Success(sampleSession);
+  }
+
+  @override
   Future<Result<OtpChallenge>> requestOtp(String email) async {
     requestOtpCalls += 1;
     return requestOtpResult ??

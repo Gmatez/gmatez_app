@@ -94,9 +94,11 @@ class RazorpayCheckout {
         'order_id': request.orderId,
         'name': 'Gmatez',
         'description': 'Calling credits',
+        'theme': {'color': '#6C4DFF'},
       });
       return await completer.future;
     } finally {
+      // Clear after the checkout activity has delivered its result.
       razorpay.clear();
     }
   }
