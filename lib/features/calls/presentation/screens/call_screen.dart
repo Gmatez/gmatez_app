@@ -65,244 +65,261 @@ class _CallScreenState extends ConsumerState<CallScreen> {
           final mainVideo = remoteVideo ?? localPreview;
           final pip = remoteVideo != null ? localPreview : null;
           return Stack(
-        fit: StackFit.expand,
-        children: [
-          if (mainVideo != null)
-            Positioned.fill(child: mainVideo)
-          else
-            const ColoredBox(color: AppColors.backgroundDeep),
-          if (mainVideo == null)
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Color(0x59141A66),
-                    Color(0xEB141A66),
-                    AppColors.backgroundDeep,
-                  ],
-                  stops: [0, 0.55, 1],
-                ),
-              ),
-            )
-          else ...[
-            const Positioned(
-              left: 0,
-              right: 0,
-              top: 0,
-              height: 160,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0xCC141A66), Color(0x00141A66)],
+            fit: StackFit.expand,
+            children: [
+              if (mainVideo != null)
+                Positioned.fill(child: mainVideo)
+              else
+                const ColoredBox(color: AppColors.backgroundDeep),
+              if (mainVideo == null)
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0x59141A66),
+                        Color(0xEB141A66),
+                        AppColors.backgroundDeep,
+                      ],
+                      stops: [0, 0.55, 1],
+                    ),
+                  ),
+                )
+              else ...[
+                const Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  height: 160,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xCC141A66), Color(0x00141A66)],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            const Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: 220,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [Color(0xE6141A66), Color(0x00141A66)],
+                const Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: 220,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [Color(0xE6141A66), Color(0x00141A66)],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ],
-          if (pip != null)
-            Positioned(
-              right: 16,
-              top: 72,
-              width: 110,
-              height: 160,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white, width: 2),
-                  borderRadius: BorderRadius.circular(12),
+              ],
+              if (pip != null)
+                Positioned(
+                  right: 16,
+                  top: 72,
+                  width: 110,
+                  height: 160,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.white, width: 2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: pip,
+                  ),
                 ),
-                child: pip,
-              ),
-            ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-              child: Column(
-                children: [
-                  Row(
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  child: Column(
                     children: [
-                      IconButton(
-                        onPressed: () {
-                          notifier.hideCallScreen();
-                          if (!widget.embedded && context.canPop()) {
-                            context.pop();
-                          }
-                        },
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                        color: Colors.white,
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.22),
-                          borderRadius: BorderRadius.circular(99),
-                          border: Border.all(
-                            color: AppColors.tideGlow.withValues(alpha: 0.35),
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: () {
+                              notifier.hideCallScreen();
+                              if (!widget.embedded && context.canPop()) {
+                                context.pop();
+                              }
+                            },
+                            icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                            color: Colors.white,
                           ),
-                        ),
-                        child: Text(
-                          isVideo ? 'Video' : 'Voice',
-                          style: const TextStyle(
-                            color: AppColors.primarySoft,
-                            fontWeight: FontWeight.w700,
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.22),
+                              borderRadius: BorderRadius.circular(99),
+                              border: Border.all(
+                                color: AppColors.tideGlow.withValues(
+                                  alpha: 0.35,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              isVideo ? 'Video' : 'Voice',
+                              style: const TextStyle(
+                                color: AppColors.primarySoft,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
+                        ],
+                      ),
+                      if (mainVideo == null) ...[
+                        const Spacer(),
+                        UserAvatar(
+                          name: peerName,
+                          imageUrl: peerAvatar,
+                          size: 120,
+                        ),
+                        const SizedBox(height: 18),
+                      ],
+                      Text(
+                        peerName,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.onDeep,
+                          fontSize: mainVideo == null ? 28 : 20,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                    ],
-                  ),
-                  if (mainVideo == null) ...[
-                    const Spacer(),
-                    UserAvatar(name: peerName, imageUrl: peerAvatar, size: 120),
-                    const SizedBox(height: 18),
-                  ],
-                  Text(
-                    peerName,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.onDeep,
-                      fontSize: mainVideo == null ? 28 : 20,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _statusLabel(status, state.mediaState),
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.72),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (status == CallStatus.connected) ...[
-                    const SizedBox(height: 6),
-                    _CallClock(connectedAt: call?.connectedAt),
-                  ],
-                  const SizedBox(height: 10),
-                  Text(
-                    rate > 0
-                        ? '${(rate / 10).toStringAsFixed(0)} credits / min'
-                        : 'Connecting secure session',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.55),
-                    ),
-                  ),
-                  if (state.permissionMessage != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      state.permissionMessage!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppColors.warningSoft),
-                    ),
-                    TextButton(
-                      onPressed: openAppSettings,
-                      child: const Text('Open settings'),
-                    ),
-                  ],
-                  if (call?.isMockProvider ?? true) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      'Preview mode · billing is live · media is simulated',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.45),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                  const Spacer(),
-                  if (status.isTerminal)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Text(
-                        'Billed ${call?.billedSeconds ?? 0}s · '
-                        '${((call?.billedAmountCents ?? 0) / 10).round()} credits',
-                        style: const TextStyle(color: Colors.white70),
-                      ),
-                    ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _Control(
-                        icon: state.muted
-                            ? Icons.mic_off_rounded
-                            : Icons.mic_rounded,
-                        label: state.muted ? 'Unmute' : 'Mute',
-                        onTap: notifier.toggleMute,
-                      ),
-                      _Control(
-                        icon: state.speakerOn
-                            ? Icons.volume_up_rounded
-                            : Icons.volume_down_rounded,
-                        label: 'Speaker',
-                        onTap: notifier.toggleSpeaker,
-                      ),
-                      if (isVideo) ...[
-                        _Control(
-                          icon: state.cameraEnabled
-                              ? Icons.videocam_rounded
-                              : Icons.videocam_off_rounded,
-                          label: 'Camera',
-                          onTap: notifier.toggleCamera,
+                      const SizedBox(height: 8),
+                      Text(
+                        _statusLabel(
+                          status,
+                          state.mediaState,
+                          state.peerConnectionIssue,
                         ),
-                        _Control(
-                          icon: Icons.cameraswitch_rounded,
-                          label: 'Flip',
-                          onTap: notifier.switchCamera,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.72),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (status == CallStatus.connected) ...[
+                        const SizedBox(height: 6),
+                        _CallClock(connectedAt: call?.connectedAt),
+                      ],
+                      const SizedBox(height: 10),
+                      Text(
+                        rate > 0
+                            ? '${(rate / 10).toStringAsFixed(0)} credits / min'
+                            : 'Connecting secure session',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.55),
+                        ),
+                      ),
+                      if (state.permissionMessage != null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          state.permissionMessage!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: AppColors.warningSoft),
+                        ),
+                        TextButton(
+                          onPressed: openAppSettings,
+                          child: const Text('Open settings'),
                         ),
                       ],
-                      _Control(
-                        icon: Icons.call_end_rounded,
-                        label: 'End',
-                        color: AppColors.danger,
-                        onTap: () async {
-                          await notifier.hangUp();
-                          if (!widget.embedded &&
-                              context.mounted &&
-                              context.canPop()) {
-                            context.pop();
-                          }
-                        },
+                      if (call?.isMockProvider ?? true) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          'Preview mode · billing is live · media is simulated',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.45),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                      const Spacer(),
+                      if (status.isTerminal)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Text(
+                            'Billed ${call?.billedSeconds ?? 0}s · '
+                            '${((call?.billedAmountCents ?? 0) / 10).round()} credits',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _Control(
+                            icon: state.muted
+                                ? Icons.mic_off_rounded
+                                : Icons.mic_rounded,
+                            label: state.muted ? 'Unmute' : 'Mute',
+                            onTap: notifier.toggleMute,
+                          ),
+                          _Control(
+                            icon: state.speakerOn
+                                ? Icons.volume_up_rounded
+                                : Icons.volume_down_rounded,
+                            label: 'Speaker',
+                            onTap: notifier.toggleSpeaker,
+                          ),
+                          if (isVideo) ...[
+                            _Control(
+                              icon: state.cameraEnabled
+                                  ? Icons.videocam_rounded
+                                  : Icons.videocam_off_rounded,
+                              label: 'Camera',
+                              onTap: notifier.toggleCamera,
+                            ),
+                            _Control(
+                              icon: Icons.cameraswitch_rounded,
+                              label: 'Flip',
+                              onTap: notifier.switchCamera,
+                            ),
+                          ],
+                          _Control(
+                            icon: Icons.call_end_rounded,
+                            label: 'End',
+                            color: AppColors.danger,
+                            onTap: () async {
+                              await notifier.hangUp();
+                              if (!widget.embedded &&
+                                  context.mounted &&
+                                  context.canPop()) {
+                                context.pop();
+                              }
+                            },
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-        ],
-      );
+            ],
+          );
         },
       ),
     );
   }
 
-  String _statusLabel(CallStatus status, CallMediaConnectionState media) {
+  String _statusLabel(
+    CallStatus status,
+    CallMediaConnectionState media,
+    bool peerConnectionIssue,
+  ) {
     if (media == CallMediaConnectionState.reconnecting) {
       return 'Reconnecting…';
     }
     if (media == CallMediaConnectionState.failed) {
       return 'Media failed';
+    }
+    if (peerConnectionIssue && !status.isTerminal) {
+      return 'Reconnecting…';
     }
     return switch (status) {
       CallStatus.initiated || CallStatus.ringing => 'Ringing…',
@@ -315,7 +332,6 @@ class _CallScreenState extends ConsumerState<CallScreen> {
       CallStatus.failed => 'Call failed',
     };
   }
-
 }
 
 class _CallClock extends StatefulWidget {
@@ -386,8 +402,7 @@ class _Control extends StatelessWidget {
     return Column(
       children: [
         Material(
-          color: color ??
-              AppColors.onDeep.withValues(alpha: 0.1),
+          color: color ?? AppColors.onDeep.withValues(alpha: 0.1),
           elevation: color == null ? 0 : 2,
           shape: const CircleBorder(),
           child: InkWell(

@@ -9,6 +9,7 @@ import '../../../../core/calling/call_state_machine.dart';
 import '../../../../core/calling/call_status.dart';
 import '../../../../core/di/core_providers.dart';
 import '../../../../core/errors/app_failure.dart';
+import '../../../../core/push/push_notifications.dart';
 import '../../../../core/realtime/realtime_service.dart';
 import '../../../../core/utils/result.dart';
 import '../../../auth/presentation/state/auth_notifier.dart';
@@ -47,6 +48,7 @@ class ActiveCallState {
     this.mediaState = CallMediaConnectionState.idle,
     this.permissionMessage,
     this.callScreenHidden = false,
+    this.peerConnectionIssue = false,
   });
 
   final CallSession? incoming;
@@ -59,6 +61,12 @@ class ActiveCallState {
   final String? permissionMessage;
   final bool callScreenHidden;
 
+  /// True while the peer's realtime socket is known to be disconnected
+  /// (via `call.peer-disconnected`) and hasn't reconnected yet. Purely a UX
+  /// signal — never affects billing/timeout, which stay governed by the
+  /// server's heartbeat/extend-hold jobs regardless.
+  final bool peerConnectionIssue;
+
   ActiveCallState copyWith({
     CallSession? incoming,
     CallSession? active,
@@ -69,6 +77,7 @@ class ActiveCallState {
     CallMediaConnectionState? mediaState,
     String? permissionMessage,
     bool? callScreenHidden,
+    bool? peerConnectionIssue,
     bool clearIncoming = false,
     bool clearActive = false,
     bool clearPermission = false,
@@ -85,6 +94,9 @@ class ActiveCallState {
           ? null
           : permissionMessage ?? this.permissionMessage,
       callScreenHidden: callScreenHidden ?? this.callScreenHidden,
+      peerConnectionIssue: clearActive
+          ? false
+          : peerConnectionIssue ?? this.peerConnectionIssue,
     );
   }
 }
@@ -93,10 +105,13 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
   StreamSubscription<RealtimeEvent>? _sub;
   StreamSubscription<CallMediaConnectionState>? _mediaSub;
   StreamSubscription<String>? _pushSub;
+  StreamSubscription<RealtimeConnectionState>? _connectionSub;
   Timer? _heartbeat;
   Timer? _tokenRenewal;
   bool _joiningMedia = false;
   bool _ending = false;
+  bool _wasDisconnected = false;
+  int _heartbeatFailures = 0;
   final _permissions = const CallPermissions();
 
   CallRepository get _calls => ref.read(callRepositoryProvider);
@@ -108,6 +123,18 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
   @override
   ActiveCallState build() {
     _sub = _realtime.events.listen(_onEvent);
+    _connectionSub = _realtime.connection.listen((connectionState) {
+      if (connectionState == RealtimeConnectionState.disconnected ||
+          connectionState == RealtimeConnectionState.reconnecting) {
+        _wasDisconnected = true;
+        return;
+      }
+      if (connectionState == RealtimeConnectionState.connected &&
+          _wasDisconnected) {
+        _wasDisconnected = false;
+        unawaited(resyncIfActive());
+      }
+    });
     _pushSub = ref.read(incomingPushBusProvider).calls.listen((callId) {
       unawaited(openIncomingFromPush(callId));
     });
@@ -121,12 +148,19 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
         unawaited(_failRtc('media_failed'));
       }
     });
+    // Captured now, not read lazily inside onDispose below — Riverpod
+    // disallows ref.read()/ref.watch() from within a dispose callback.
+    final media = _media;
     ref.onDispose(() {
       _sub?.cancel();
+      _connectionSub?.cancel();
       _mediaSub?.cancel();
       _pushSub?.cancel();
       _heartbeat?.cancel();
       _tokenRenewal?.cancel();
+      // Best-effort: if this provider is ever torn down mid-call, don't
+      // leak the native Agora engine/mic/camera.
+      unawaited(media.leave().catchError((_) {}));
     });
     return const ActiveCallState();
   }
@@ -148,6 +182,7 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
       }
       if (value.status.isTerminal) {
         ref.read(incomingPushBusProvider).clear(callId);
+        unawaited(cancelIncomingCallNotification(callId));
         return;
       }
       if (value.calleeId == me &&
@@ -156,6 +191,7 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
         state = state.copyWith(incoming: value);
       } else {
         state = state.copyWith(active: value, callScreenHidden: false);
+        unawaited(cancelIncomingCallNotification(callId));
       }
       ref.read(incomingPushBusProvider).clear(callId);
     }
@@ -208,11 +244,15 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
     );
     state = state.copyWith(busy: false);
     if (result case Success(:final value)) {
+      final staleIncomingId = state.incoming?.id;
       state = state.copyWith(
         active: value,
         clearIncoming: true,
         callScreenHidden: false,
       );
+      if (staleIncomingId != null) {
+        unawaited(cancelIncomingCallNotification(staleIncomingId));
+      }
     }
     return result;
   }
@@ -230,10 +270,18 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
     }
     final permitted = await _ensurePermissions(video: incoming.isVideo);
     if (!permitted) {
+      final message =
+          state.permissionMessage ?? 'Microphone permission required';
+      // Tell the backend the callee effectively declined (don't make the
+      // caller wait out the full ring timeout), and dismiss the overlay —
+      // otherwise this just looked like Accept silently did nothing.
+      unawaited(_calls.reject(incoming.id));
+      state = state.copyWith(clearIncoming: true, clearPermission: true);
+      unawaited(cancelIncomingCallNotification(incoming.id));
       return Failure(
         AppFailure(
           kind: FailureKind.forbidden,
-          message: state.permissionMessage ?? 'Microphone permission required',
+          message: message,
           code: 'CALL_PERMISSION_DENIED',
         ),
       );
@@ -241,6 +289,7 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
     state = state.copyWith(busy: true);
     final result = await _calls.accept(incoming.id);
     state = state.copyWith(busy: false, clearIncoming: true);
+    unawaited(cancelIncomingCallNotification(incoming.id));
     if (result case Success(:final value)) {
       state = state.copyWith(active: value, callScreenHidden: false);
       await _ensureRtcJoined(value, prefer: value.rtc);
@@ -256,6 +305,7 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
     }
     await _calls.reject(incoming.id);
     state = state.copyWith(clearIncoming: true);
+    unawaited(cancelIncomingCallNotification(incoming.id));
   }
 
   Future<void> hangUp() async {
@@ -294,28 +344,57 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
 
   Future<void> toggleMute() async {
     final next = !state.muted;
-    await _media.setMuted(next);
-    state = state.copyWith(muted: next);
+    try {
+      await _media.setMuted(next);
+      state = state.copyWith(muted: next);
+    } catch (_) {
+      // Leave state.muted unchanged — a transient platform-channel error
+      // must not make the button claim a state that never actually took.
+    }
   }
 
   Future<void> toggleCamera() async {
     final next = !state.cameraEnabled;
-    await _media.setCameraEnabled(next);
-    state = state.copyWith(cameraEnabled: next);
+    try {
+      await _media.setCameraEnabled(next);
+      state = state.copyWith(cameraEnabled: next);
+    } catch (_) {
+      // Leave state.cameraEnabled unchanged — see toggleMute().
+    }
   }
 
   Future<void> toggleSpeaker() async {
     final next = !state.speakerOn;
-    await _media.setSpeakerEnabled(next);
-    state = state.copyWith(speakerOn: next);
+    try {
+      await _media.setSpeakerEnabled(next);
+      state = state.copyWith(speakerOn: next);
+    } catch (_) {
+      // Leave state.speakerOn unchanged — see toggleMute().
+    }
   }
 
   Future<void> switchCamera() async {
-    await _media.switchCamera();
+    try {
+      await _media.switchCamera();
+    } catch (_) {
+      // Best-effort; nothing in state tracks which physical camera is active.
+    }
   }
 
   void _onEvent(RealtimeEvent event) {
     if (!event.name.startsWith('call.')) {
+      return;
+    }
+    // These carry {callId, userId}, not a full call payload — handle before
+    // the generic CallSession.fromJson parse below.
+    if (event.name == 'call.peer-disconnected' ||
+        event.name == 'call.peer-reconnected') {
+      final callId = event.payload['callId'] as String?;
+      if (callId != null && state.active?.id == callId) {
+        state = state.copyWith(
+          peerConnectionIssue: event.name == 'call.peer-disconnected',
+        );
+      }
       return;
     }
     final next = CallSession.fromJson(event.payload);
@@ -339,15 +418,31 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
 
     final current = state.active;
     if (current == null || current.id != next.id) {
-      if (next.status.isTerminal) {
-        if (state.incoming?.id == next.id) {
-          state = state.copyWith(clearIncoming: true);
-        }
-        return;
+      // No matching state.active for this event — it can only be about our
+      // state.incoming. Dismiss the ringing overlay whenever the call has
+      // moved past ringing for ANY reason (terminal, or progressed to
+      // accepted/connecting/connected because it was answered on another
+      // signed-in session) — this device never became the active one, so
+      // there's nothing left for it to do with this call.
+      if (state.incoming?.id == next.id &&
+          next.status != CallStatus.ringing &&
+          next.status != CallStatus.initiated) {
+        state = state.copyWith(clearIncoming: true);
+        unawaited(cancelIncomingCallNotification(next.id));
       }
       return;
     }
+    _applyServerCall(next);
+  }
 
+  /// Reconciles `state.active` against a fresh server-reported [next],
+  /// shared by the live socket-event path and the reconnect/resume resync
+  /// paths below. Caller must already know `next` is about `state.active`.
+  void _applyServerCall(CallSession next) {
+    final current = state.active;
+    if (current == null || current.id != next.id) {
+      return;
+    }
     if (current.status == next.status) {
       final updated = current.copyWith(
         billedSeconds: next.billedSeconds,
@@ -384,7 +479,33 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
       unawaited(_ensureRtcJoined(merged));
       _startHeartbeat(merged.id);
     }
-    state = state.copyWith(active: merged);
+    state = state.copyWith(active: merged, peerConnectionIssue: false);
+  }
+
+  /// Re-fetches state.active/incoming from the server and reconciles.
+  /// Used on realtime reconnect and app resume — anywhere the client's
+  /// in-memory call state may have silently drifted from the server's.
+  Future<void> resyncIfActive() async {
+    final activeId = state.active?.id;
+    if (activeId != null) {
+      final result = await _calls.getById(activeId);
+      if (result case Success(:final value)) {
+        _applyServerCall(value);
+      }
+      return;
+    }
+    final incomingId = state.incoming?.id;
+    if (incomingId != null) {
+      final result = await _calls.getById(incomingId);
+      if (result case Success(:final value)) {
+        if (value.status.isTerminal ||
+            (value.status != CallStatus.ringing &&
+                value.status != CallStatus.initiated)) {
+          state = state.copyWith(clearIncoming: true);
+          unawaited(cancelIncomingCallNotification(incomingId));
+        }
+      }
+    }
   }
 
   Future<bool> _ensurePermissions({required bool video}) async {
@@ -408,7 +529,8 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
         return false;
       case CallPermissionResult.restricted:
         state = state.copyWith(
-          permissionMessage: 'Calling permissions are restricted on this device.',
+          permissionMessage:
+              'Calling permissions are restricted on this device.',
         );
         return false;
     }
@@ -542,6 +664,15 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
       await _media.renewToken(value.token);
       state = state.copyWith(active: active.copyWith(rtc: value));
       _scheduleTokenRenewal(callId, value.tokenExpiresAt);
+    } else {
+      // Transient failure (network blip, momentary server error) — retry
+      // shortly rather than silently giving up and letting the token
+      // expire mid-call. _scheduleTokenRenewal cancels any prior timer.
+      _tokenRenewal?.cancel();
+      _tokenRenewal = Timer(
+        const Duration(seconds: 30),
+        () => unawaited(_renewToken(callId)),
+      );
     }
   }
 
@@ -556,15 +687,33 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
 
   void _startHeartbeat(String callId) {
     _heartbeat?.cancel();
+    _heartbeatFailures = 0;
     _heartbeat = Timer.periodic(const Duration(seconds: 10), (_) {
       _realtime.emit('call.heartbeat', {'callId': callId});
-      unawaited(_calls.heartbeat(callId));
+      unawaited(
+        _calls.heartbeat(callId).then((result) {
+          if (result case Failure()) {
+            _heartbeatFailures += 1;
+            // A couple of REST heartbeat failures in a row means our view
+            // of the call may be stale (expired session, dropped network)
+            // — resync rather than free-running with no signal at all.
+            if (_heartbeatFailures >= 2) {
+              _heartbeatFailures = 0;
+              unawaited(resyncIfActive());
+            }
+          } else {
+            _heartbeatFailures = 0;
+          }
+        }),
+      );
     });
   }
 
   Future<void> _leave() async {
     _heartbeat?.cancel();
     _tokenRenewal?.cancel();
+    final staleIncomingId = state.incoming?.id;
+    final staleActiveId = state.active?.id;
     await _media.leave();
     state = state.copyWith(
       clearActive: true,
@@ -576,6 +725,12 @@ class ActiveCallNotifier extends Notifier<ActiveCallState> {
       callScreenHidden: false,
       clearPermission: true,
     );
+    if (staleIncomingId != null) {
+      unawaited(cancelIncomingCallNotification(staleIncomingId));
+    }
+    if (staleActiveId != null) {
+      unawaited(cancelIncomingCallNotification(staleActiveId));
+    }
   }
 }
 

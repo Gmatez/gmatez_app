@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gmatez_app/core/calling/call_media_provider.dart';
+import 'package:gmatez_app/core/di/core_providers.dart';
 import 'package:gmatez_app/core/errors/app_failure.dart';
 import 'package:gmatez_app/core/pagination/cursor_page.dart';
 import 'package:gmatez_app/core/utils/result.dart';
+import 'package:gmatez_app/features/calls/presentation/state/active_call_notifier.dart';
 import 'package:gmatez_app/features/discovery/presentation/screens/discovery_screen.dart';
 import 'package:gmatez_app/features/discovery/presentation/state/discovery_notifier.dart';
 import 'package:gmatez_app/features/profile/domain/entities/user_profile.dart';
@@ -11,9 +14,19 @@ import 'package:gmatez_app/features/profile/presentation/screens/edit_profile_sc
 import 'package:gmatez_app/features/profile/presentation/screens/public_profile_screen.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../fakes/fake_calling.dart';
 import '../../fakes/fake_discovery_profile_repositories.dart';
 
 void main() {
+  // DiscoveryUserTile/PublicProfileScreen both watch activeCallProvider's
+  // busy flag (double-submit guard), which means ActiveCallNotifier.build()
+  // runs for any test that renders them — it needs these three providers.
+  final callingOverrides = [
+    realtimeServiceProvider.overrideWithValue(FakeRealtimeService()),
+    callMediaProvider.overrideWithValue(MockCallMediaProvider()),
+    callRepositoryProvider.overrideWithValue(FakeCallRepository()),
+  ];
+
   testWidgets('discovery renders users from the repository', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -22,6 +35,7 @@ void main() {
             FakeDiscoveryRepository(),
           ),
           profileRepositoryProvider.overrideWithValue(FakeProfileRepository()),
+          ...callingOverrides,
         ],
         child: MaterialApp.router(
           routerConfig: GoRouter(
@@ -105,6 +119,7 @@ void main() {
               ),
             ),
           ),
+          ...callingOverrides,
         ],
         child: const MaterialApp(home: PublicProfileScreen(userId: 'user-2')),
       ),

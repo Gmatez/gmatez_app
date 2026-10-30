@@ -129,7 +129,12 @@ class _SessionLifecycleState extends ConsumerState<SessionLifecycle>
       unawaited(ref.read(authNotifierProvider.notifier).refreshUser());
     }
     if (auth.isAuthenticated) {
+      // restoreIfNeeded() only acts when nothing is held in memory yet;
+      // resyncIfActive() re-validates a call already held in memory
+      // against the server (it may have silently resolved while
+      // backgrounded without this device catching every realtime event).
       unawaited(ref.read(activeCallProvider.notifier).restoreIfNeeded());
+      unawaited(ref.read(activeCallProvider.notifier).resyncIfActive());
     }
   }
 
@@ -144,6 +149,10 @@ class _SessionLifecycleState extends ConsumerState<SessionLifecycle>
           await realtime.connect(token);
         }
         await ref.read(pushNotificationServiceProvider).registerCurrentUser();
+        // Cold start recovery: if the app was killed mid-call and reopened
+        // from the home-screen icon (not the call notification), this is
+        // the only place that discovers a still-live server-side call.
+        unawaited(ref.read(activeCallProvider.notifier).restoreIfNeeded());
         final pending = ref.read(incomingPushBusProvider).pendingCallId;
         if (pending != null) {
           await ref

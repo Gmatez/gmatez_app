@@ -73,11 +73,7 @@ class CallRepositoryImpl implements CallRepository {
 
   @override
   Future<Result<CallSession>> end(String id) {
-    return _client.post(
-      ApiPaths.callEnd(id),
-      body: _emptyJson,
-      parser: _parse,
-    );
+    return _client.post(ApiPaths.callEnd(id), body: _emptyJson, parser: _parse);
   }
 
   @override
@@ -113,7 +109,7 @@ class CallRepositoryImpl implements CallRepository {
   Future<Result<CallSession>> rtcFailed(String id, {String? reason}) {
     return _client.post(
       ApiPaths.callRtcFailed(id),
-      body: {?reason},
+      body: {'reason': ?reason},
       parser: _parse,
     );
   }

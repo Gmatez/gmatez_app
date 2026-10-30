@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/utils/result.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../screens/call_screen.dart';
 import '../state/active_call_notifier.dart';
@@ -30,47 +31,44 @@ class _IncomingCallHostState extends ConsumerState<IncomingCallHost> {
       children: [
         widget.child,
         if (active != null && showCall)
-          Positioned.fill(
-            child: CallScreen(callId: active.id, embedded: true),
-          ),
+          Positioned.fill(child: CallScreen(callId: active.id, embedded: true)),
         if (active != null &&
             !active.status.isTerminal &&
             callState.callScreenHidden)
-              Positioned(
-                left: 12,
-                right: 12,
-                top: MediaQuery.paddingOf(context).top + 8,
-                child: Material(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(16),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => ref
-                        .read(activeCallProvider.notifier)
-                        .showCallScreen(),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      child: Row(
-                        children: [
-                          Icon(Icons.call_rounded, color: Colors.white),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Call in progress · tap to open',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
+          Positioned(
+            left: 12,
+            right: 12,
+            top: MediaQuery.paddingOf(context).top + 8,
+            child: Material(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () =>
+                    ref.read(activeCallProvider.notifier).showCallScreen(),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      Icon(Icons.call_rounded, color: Colors.white),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Call in progress · tap to open',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
                           ),
-                          Icon(Icons.open_in_full_rounded, color: Colors.white),
-                        ],
+                        ),
                       ),
-                    ),
+                      Icon(Icons.open_in_full_rounded, color: Colors.white),
+                    ],
                   ),
                 ),
               ),
-            if (incoming != null)
+            ),
+          ),
+        if (incoming != null)
           Positioned.fill(
             child: Material(
               color: AppColors.backgroundDeep.withValues(alpha: 0.96),
@@ -87,88 +85,102 @@ class _IncomingCallHostState extends ConsumerState<IncomingCallHost> {
                   ),
                 ),
                 child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
-                  child: Column(
-                    children: [
-                      Text(
-                        incoming.isVideo
-                            ? 'Incoming video call'
-                            : 'Incoming voice call',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.72),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const Spacer(),
-                      PulseGlowAvatar(
-                        name: incoming.callerDisplayName ?? 'Caller',
-                        imageUrl: incoming.callerAvatarUrl,
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        incoming.callerDisplayName ?? 'Someone is calling',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        incoming.isVideo
-                            ? 'Video · Answer to connect'
-                            : 'Voice · Answer to connect',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.7),
-                        ),
-                      ),
-                      const Spacer(),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _RoundAction(
-                            color: AppColors.danger,
-                            icon: Icons.call_end_rounded,
-                            label: 'Decline',
-                            onTap: () {
-                              HapticFeedback.mediumImpact();
-                              ref
-                                  .read(activeCallProvider.notifier)
-                                  .rejectIncoming();
-                            },
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
+                    child: Column(
+                      children: [
+                        Text(
+                          incoming.isVideo
+                              ? 'Incoming video call'
+                              : 'Incoming voice call',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.72),
+                            fontWeight: FontWeight.w600,
                           ),
-                          _RoundAction(
-                            color: AppColors.primary,
-                            icon: incoming.isVideo
-                                ? Icons.videocam_rounded
-                                : Icons.call_rounded,
-                            label: 'Accept',
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              Future<void>(() async {
-                                final result = await ref
+                        ),
+                        const Spacer(),
+                        PulseGlowAvatar(
+                          name: incoming.callerDisplayName ?? 'Caller',
+                          imageUrl: incoming.callerAvatarUrl,
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          incoming.callerDisplayName ?? 'Someone is calling',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          incoming.isVideo
+                              ? 'Video · Answer to connect'
+                              : 'Voice · Answer to connect',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                          ),
+                        ),
+                        const Spacer(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _RoundAction(
+                              color: AppColors.danger,
+                              icon: Icons.call_end_rounded,
+                              label: 'Decline',
+                              onTap: () {
+                                HapticFeedback.mediumImpact();
+                                ref
                                     .read(activeCallProvider.notifier)
-                                    .acceptIncoming();
-                                if (result.isSuccess && context.mounted) {
-                                  ref
-                                      .read(activeCallProvider.notifier)
-                                      .showCallScreen();
+                                    .rejectIncoming();
+                              },
+                            ),
+                            _RoundAction(
+                              color: AppColors.primary,
+                              icon: incoming.isVideo
+                                  ? Icons.videocam_rounded
+                                  : Icons.call_rounded,
+                              label: 'Accept',
+                              onTap: () {
+                                if (ref.read(activeCallProvider).busy) {
+                                  return;
                                 }
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
+                                HapticFeedback.lightImpact();
+                                Future<void>(() async {
+                                  final result = await ref
+                                      .read(activeCallProvider.notifier)
+                                      .acceptIncoming();
+                                  if (!context.mounted) {
+                                    return;
+                                  }
+                                  if (result.isSuccess) {
+                                    ref
+                                        .read(activeCallProvider.notifier)
+                                        .showCallScreen();
+                                  } else if (result case Failure(
+                                    :final failure,
+                                  )) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(failure.userMessage),
+                                      ),
+                                    );
+                                  }
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              ),
             ),
           ),
-        ],
+      ],
     );
   }
 }

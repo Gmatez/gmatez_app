@@ -24,6 +24,7 @@ class PublicProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(publicProfileProvider(userId));
+    final callBusy = ref.watch(activeCallProvider.select((s) => s.busy));
 
     return MistScaffold(
       appBar: AppBar(
@@ -59,14 +60,11 @@ class PublicProfileScreen extends ConsumerWidget {
               child: AppLayout.constrain(
                 context,
                 child: ListView(
-                  padding: AppLayout.pagePadding(context).copyWith(
-                    top: AppSpacing.sm,
-                    bottom: AppSpacing.xl,
-                  ),
+                  padding: AppLayout.pagePadding(
+                    context,
+                  ).copyWith(top: AppSpacing.sm, bottom: AppSpacing.xl),
                   children: [
-                    FadeInUp(
-                      child: ProfileHeader(profile: value),
-                    ),
+                    FadeInUp(child: ProfileHeader(profile: value)),
                     const SizedBox(height: AppSpacing.xl),
                     FadeInUp(
                       delay: AppDurations.fast,
@@ -78,14 +76,18 @@ class PublicProfileScreen extends ConsumerWidget {
                         AppButton(
                           label: AppStrings.of(context)('voiceCall'),
                           icon: Icons.call_rounded,
-                          onPressed: value.availableForCall && value.voiceEnabled
+                          onPressed: callBusy
+                              ? null
+                              : value.availableForCall && value.voiceEnabled
                               ? () => _startCall(context, ref, 'VOICE')
                               : () => _unavailable(context),
                         ),
                         AppButton(
                           label: AppStrings.of(context)('videoCall'),
                           icon: Icons.videocam_rounded,
-                          onPressed: value.availableForCall && value.videoEnabled
+                          onPressed: callBusy
+                              ? null
+                              : value.availableForCall && value.videoEnabled
                               ? () => _startCall(context, ref, 'VIDEO')
                               : () => _unavailable(context),
                         ),
@@ -122,6 +124,9 @@ class PublicProfileScreen extends ConsumerWidget {
     WidgetRef ref,
     String callType,
   ) async {
+    if (ref.read(activeCallProvider).busy) {
+      return;
+    }
     final result = await ref
         .read(activeCallProvider.notifier)
         .startCall(calleeId: userId, callType: callType);
@@ -129,8 +134,10 @@ class PublicProfileScreen extends ConsumerWidget {
       return;
     }
     switch (result) {
-      case Success(:final value):
-        await context.push(AppRoutes.callFor(value.id));
+      case Success():
+        // The global IncomingCallHost overlay already shows the call screen
+        // the moment startCall() sets state.active.
+        break;
       case Failure(:final failure):
         ScaffoldMessenger.of(
           context,
@@ -207,4 +214,3 @@ class PublicProfileScreen extends ConsumerWidget {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
-

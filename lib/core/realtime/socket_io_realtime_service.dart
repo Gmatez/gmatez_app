@@ -88,6 +88,8 @@ class SocketIoRealtimeService implements RealtimeService {
       'call.connected',
       'call.ended',
       'call.failed',
+      'call.peer-disconnected',
+      'call.peer-reconnected',
       'presence.updated',
       'notification.received',
       'wallet.updated',

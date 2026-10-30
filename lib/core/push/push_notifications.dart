@@ -106,7 +106,7 @@ Future<void> _showIncomingCallNotification(Map<String, dynamic> data) async {
     title,
     body,
     const NotificationDetails(
-        android: AndroidNotificationDetails(
+      android: AndroidNotificationDetails(
         incomingCallChannelId,
         'Incoming calls',
         channelDescription: 'Rings when someone calls you',
@@ -117,6 +117,12 @@ Future<void> _showIncomingCallNotification(Map<String, dynamic> data) async {
         playSound: true,
         sound: _callSound,
         enableVibration: true,
+        // Launches the app over the lock screen instead of showing an
+        // easy-to-miss heads-up banner. Requires USE_FULL_SCREEN_INTENT
+        // (manifest) + android:showWhenLocked/turnScreenOn on MainActivity
+        // (manifest) + a data-only FCM payload (backend) to actually fire
+        // reliably from a backgrounded/killed app.
+        fullScreenIntent: true,
       ),
       iOS: DarwinNotificationDetails(
         presentAlert: true,
@@ -126,6 +132,21 @@ Future<void> _showIncomingCallNotification(Map<String, dynamic> data) async {
     ),
     payload: callId,
   );
+}
+
+/// Dismiss the native incoming-call notification/ringtone for [callId].
+/// Call this on every resolution path (accept, reject, resolved on another
+/// device, terminal status) — otherwise a late-delivered push can keep
+/// ringing/displaying for a call that's already been dealt with.
+Future<void> cancelIncomingCallNotification(String callId) async {
+  if (callId.isEmpty) {
+    return;
+  }
+  try {
+    await localNotifications.cancel(callId.hashCode);
+  } catch (_) {
+    // Best-effort.
+  }
 }
 
 class PushNotificationService {
@@ -239,7 +260,10 @@ class PushNotificationService {
   void _onMessage(RemoteMessage message) {
     final data = message.data;
     if (data['type'] == 'incoming_call') {
-      unawaited(_showIncomingCallNotification(data));
+      // Foreground: the in-app IncomingCallHost overlay (driven by
+      // _dispatch below) is the UI — showing the native heads-up
+      // notification too would duplicate it. The native notification is
+      // for background/killed state only (firebaseMessagingBackgroundHandler).
       _dispatch(data);
       return;
     }

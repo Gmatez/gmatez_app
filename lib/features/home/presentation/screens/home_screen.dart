@@ -57,25 +57,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _error = null;
     });
     final results = await Future.wait([
-      ref.read(apiClientProvider).get(
-        ApiPaths.wallet,
-        parser: (data) => WalletSnapshot.fromJson(asMap(data)),
-      ),
+      ref
+          .read(apiClientProvider)
+          .get(
+            ApiPaths.wallet,
+            parser: (data) => WalletSnapshot.fromJson(asMap(data)),
+          ),
       ref.read(callRepositoryProvider).history(),
-      ref.read(discoveryRepositoryProvider).feed(
-        DiscoveryQuery(
-          limit: 12,
-          onlineOnly: _onlineOnly,
-          language: _language,
-        ),
-      ),
-      ref.read(apiClientProvider).get(
-        ApiPaths.banners,
-        parser: (data) => asMapList(data)
-            .map(PromoBanner.fromJson)
-            .where((b) => b.id.isNotEmpty && b.title.isNotEmpty)
-            .toList(),
-      ),
+      ref
+          .read(discoveryRepositoryProvider)
+          .feed(
+            DiscoveryQuery(
+              limit: 12,
+              onlineOnly: _onlineOnly,
+              language: _language,
+            ),
+          ),
+      ref
+          .read(apiClientProvider)
+          .get(
+            ApiPaths.banners,
+            parser: (data) => asMapList(data)
+                .map(PromoBanner.fromJson)
+                .where((b) => b.id.isNotEmpty && b.title.isNotEmpty)
+                .toList(),
+          ),
     ]);
     if (!mounted) {
       return;
@@ -184,9 +190,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ],
               const SizedBox(height: AppSpacing.lg),
               if (_loading)
-                const ScreenSkeleton.home(
-                  padding: EdgeInsets.zero,
-                )
+                const ScreenSkeleton.home(padding: EdgeInsets.zero)
               else ...[
                 if (_error != null)
                   Padding(
@@ -396,15 +400,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     onAction: () => context.go(AppRoutes.discover),
                   )
                 else
-                  ..._hosts.take(5).map(
-                    (host) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _OnlineHostTile(
-                        host: host,
-                        userRateCents: ref.watch(userCallRateProvider).value,
+                  ..._hosts
+                      .take(5)
+                      .map(
+                        (host) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _OnlineHostTile(
+                            host: host,
+                            userRateCents: ref
+                                .watch(userCallRateProvider)
+                                .value,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
               ],
             ],
           ),
@@ -470,6 +478,7 @@ class _RecentCallTile extends ConsumerWidget {
         ? (call.calleeDisplayName ?? 'User')
         : (call.callerDisplayName ?? 'User');
     final peerId = mine ? call.calleeId : call.callerId;
+    final callBusy = ref.watch(activeCallProvider.select((s) => s.busy));
     final missed = const {
       'TIMEOUT',
       'REJECTED',
@@ -497,18 +506,22 @@ class _RecentCallTile extends ConsumerWidget {
           IconButton(
             tooltip: 'Call back',
             visualDensity: VisualDensity.compact,
-            onPressed: () async {
-              final result = await ref
-                  .read(activeCallProvider.notifier)
-                  .startCall(
-                    calleeId: peerId,
-                    callType: call.isVideo ? 'VIDEO' : 'VOICE',
-                  );
-              if (!context.mounted) return;
-              if (result case Success(:final value)) {
-                await context.push(AppRoutes.callFor(value.id));
-              }
-            },
+            onPressed: callBusy
+                ? null
+                : () async {
+                    if (ref.read(activeCallProvider).busy) {
+                      return;
+                    }
+                    // The global IncomingCallHost overlay shows the call
+                    // screen as soon as startCall() sets state.active — no
+                    // need to also push a route for it.
+                    await ref
+                        .read(activeCallProvider.notifier)
+                        .startCall(
+                          calleeId: peerId,
+                          callType: call.isVideo ? 'VIDEO' : 'VOICE',
+                        );
+                  },
             icon: const Icon(Icons.call_rounded, color: AppColors.primary),
           ),
         ],
@@ -527,7 +540,9 @@ class _OnlineHostTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rate = displayRateCents(host.ratePerMinuteCents, userRateCents);
-    final rateLabel = rate > 0 ? '${(rate / 10).round()} cr/min' : 'Ask for rates';
+    final rateLabel = rate > 0
+        ? '${(rate / 10).round()} cr/min'
+        : 'Ask for rates';
     final languages = host.languages
         .map((code) => speakingLanguages[code] ?? code)
         .take(3)
@@ -561,14 +576,20 @@ class _OnlineHostTile extends StatelessWidget {
                       host.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       host.bio.isEmpty ? 'Ready for a conversation' : host.bio,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: AppColors.textSecondary, height: 1.3),
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        height: 1.3,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Wrap(
@@ -576,16 +597,30 @@ class _OnlineHostTile extends StatelessWidget {
                       runSpacing: 6,
                       children: [
                         _MiniTag(
-                          icon: host.online ? Icons.circle : Icons.circle_outlined,
+                          icon: host.online
+                              ? Icons.circle
+                              : Icons.circle_outlined,
                           label: host.online ? 'Online' : 'Away',
                         ),
                         if (languages.isNotEmpty)
-                          _MiniTag(icon: Icons.translate_rounded, label: languages),
-                        _MiniTag(icon: Icons.payments_outlined, label: rateLabel),
+                          _MiniTag(
+                            icon: Icons.translate_rounded,
+                            label: languages,
+                          ),
+                        _MiniTag(
+                          icon: Icons.payments_outlined,
+                          label: rateLabel,
+                        ),
                         if (host.voiceEnabled)
-                          const _MiniTag(icon: Icons.call_rounded, label: 'Voice'),
+                          const _MiniTag(
+                            icon: Icons.call_rounded,
+                            label: 'Voice',
+                          ),
                         if (host.videoEnabled)
-                          const _MiniTag(icon: Icons.videocam_rounded, label: 'Video'),
+                          const _MiniTag(
+                            icon: Icons.videocam_rounded,
+                            label: 'Video',
+                          ),
                       ],
                     ),
                   ],
@@ -618,7 +653,10 @@ class _MiniTag extends StatelessWidget {
         children: [
           Icon(icon, size: 12, color: AppColors.primary),
           const SizedBox(width: 4),
-          Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+          ),
         ],
       ),
     );

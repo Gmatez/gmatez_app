@@ -56,6 +56,9 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
   }
 
   Future<void> _redial(CallSession call, String callType) async {
+    if (ref.read(activeCallProvider).busy) {
+      return;
+    }
     final myId = ref.read(authNotifierProvider).user?.id;
     final peerId = call.callerId == myId ? call.calleeId : call.callerId;
     final result = await ref
@@ -65,13 +68,16 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
       return;
     }
     switch (result) {
-      case Success(:final value):
-        await context.push(AppRoutes.callFor(value.id));
+      case Success():
+        // The global IncomingCallHost overlay shows the call screen as
+        // soon as startCall() sets state.active.
+        break;
       case Failure(:final failure):
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(failure.userMessage),
-            action: (failure.code == 'WALLET_INSUFFICIENT_FUNDS' ||
+            action:
+                (failure.code == 'WALLET_INSUFFICIENT_FUNDS' ||
                         failure.code == 'INSUFFICIENT_BALANCE') &&
                     ref.read(authNotifierProvider).user?.isActiveHost != true
                 ? SnackBarAction(
@@ -106,10 +112,9 @@ class _CallHistoryScreenState extends ConsumerState<CallHistoryScreen> {
               color: AppColors.primary,
               onRefresh: _load,
               child: ListView(
-                padding: AppLayout.pagePadding(context).copyWith(
-                  top: AppSpacing.md,
-                  bottom: AppSpacing.lg,
-                ),
+                padding: AppLayout.pagePadding(
+                  context,
+                ).copyWith(top: AppSpacing.md, bottom: AppSpacing.lg),
                 children: [
                   ScreenHeader(
                     title: AppStrings.of(context)('calls'),
@@ -236,4 +241,3 @@ String _ago(DateTime? time) {
   }
   return '${delta.inDays} days ago';
 }
-

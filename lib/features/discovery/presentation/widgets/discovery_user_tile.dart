@@ -29,6 +29,7 @@ class DiscoveryUserTile extends ConsumerWidget {
       ref.watch(userCallRateProvider).value,
     );
     final rate = '${(rateCents / 10).round()} cr/min';
+    final callBusy = ref.watch(activeCallProvider.select((s) => s.busy));
 
     return AppCard(
       onTap: onTap,
@@ -73,7 +74,9 @@ class DiscoveryUserTile extends ConsumerWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      user.bio.isEmpty ? 'Professional listener · Ready now' : user.bio,
+                      user.bio.isEmpty
+                          ? 'Professional listener · Ready now'
+                          : user.bio,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.figtree(
@@ -109,7 +112,8 @@ class DiscoveryUserTile extends ConsumerWidget {
                   label: 'Voice',
                   icon: Icons.call_rounded,
                   variant: AppButtonVariant.secondary,
-                  onPressed: user.availableForCall && user.voiceEnabled
+                  onPressed:
+                      user.availableForCall && user.voiceEnabled && !callBusy
                       ? () => _call(context, ref, 'VOICE')
                       : null,
                 ),
@@ -119,7 +123,8 @@ class DiscoveryUserTile extends ConsumerWidget {
                 child: AppButton(
                   label: 'Video',
                   icon: Icons.videocam_rounded,
-                  onPressed: user.availableForCall && user.videoEnabled
+                  onPressed:
+                      user.availableForCall && user.videoEnabled && !callBusy
                       ? () => _call(context, ref, 'VIDEO')
                       : null,
                 ),
@@ -136,6 +141,9 @@ class DiscoveryUserTile extends ConsumerWidget {
     WidgetRef ref,
     String callType,
   ) async {
+    if (ref.read(activeCallProvider).busy) {
+      return;
+    }
     final result = await ref
         .read(activeCallProvider.notifier)
         .startCall(calleeId: user.userId, callType: callType);
@@ -143,8 +151,11 @@ class DiscoveryUserTile extends ConsumerWidget {
       return;
     }
     switch (result) {
-      case Success(:final value):
-        await context.push(AppRoutes.callFor(value.id));
+      case Success():
+        // The global IncomingCallHost overlay already shows the call screen
+        // the moment startCall() sets state.active — pushing a route here
+        // would mount a second CallScreen on top of it.
+        break;
       case Failure(:final failure):
         final goWallet =
             failure.code == 'WALLET_INSUFFICIENT_FUNDS' ||
@@ -152,7 +163,8 @@ class DiscoveryUserTile extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(failure.userMessage),
-            action: goWallet &&
+            action:
+                goWallet &&
                     ref.read(authNotifierProvider).user?.isActiveHost != true
                 ? SnackBarAction(
                     label: 'Top up',
@@ -200,8 +212,6 @@ class DiscoverySkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ScreenSkeleton.feed(
-      padding: EdgeInsets.all(padding),
-    );
+    return ScreenSkeleton.feed(padding: EdgeInsets.all(padding));
   }
 }
